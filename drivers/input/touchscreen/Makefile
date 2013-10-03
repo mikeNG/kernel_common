@@ -93,3 +93,5 @@ obj-$(CONFIG_TOUCHSCREEN_ZFORCE)	+= zforce_ts.o
 obj-$(CONFIG_TOUCHSCREEN_COLIBRI_VF50)	+= colibri-vf50-ts.o
 obj-$(CONFIG_TOUCHSCREEN_ROHM_BU21023)	+= rohm_bu21023.o
 obj-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI4_HW)	+= synaptics_i2c_rmi4_hw.o
+obj-$(CONFIG_TOUCHSCREEN_CLEARPAD)	+= clearpad_core.o
+obj-$(CONFIG_TOUCHSCREEN_CLEARPAD_I2C)	+= clearpad_i2c.o

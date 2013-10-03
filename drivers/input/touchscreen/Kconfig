@@ -1118,6 +1118,20 @@ config TOUCHSCREEN_SYNAPTICS_I2C_RMI4_HW
 	  To compile this driver as a module, choose M here: the
 	  module will be called synaptics_i2c_rmi4_hw.
 
+config TOUCHSCREEN_CLEARPAD
+	tristate "Synaptics ClearPad"
+	default n
+	help
+	  Say Y here to enable Synaptics ClearPad touchscreen.
+
+config TOUCHSCREEN_CLEARPAD_I2C
+	tristate "Synaptics ClearPad I2C"
+	depends on I2C
+	depends on TOUCHSCREEN_CLEARPAD
+	default n
+	help
+	  Say Y here to enable Synaptics ClearPad I2C touchscreen.
+
 config TOUCHSCREEN_GEN_VKEYS
        tristate "Touchscreen Virtual Keys Driver"
        help
