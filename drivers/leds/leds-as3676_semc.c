@@ -783,7 +783,8 @@ static void as3676_set_brightness(struct as3676_record *rd,
 				reg_set(rd, AS3676_REG_CTRL, ctrl_val & ~0x08);
 			} else if (!rd->dcdcbit) { /* Enable Step-up */
 				reg_set(rd, AS3676_REG_CTRL, ctrl_val | 0x08);
-				usleep(AS3676_REG_CTRL_WAIT_US);
+				usleep_range(AS3676_REG_CTRL_WAIT_US,
+					AS3676_REG_CTRL_WAIT_US);
 			}
 			rd->dcdcbit = dcdcbit;
 		}
