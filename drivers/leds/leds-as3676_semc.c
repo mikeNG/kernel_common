@@ -1617,7 +1617,7 @@ static void as3676_shutdown(struct i2c_client *client)
 	as3676_unlock(rd);
 }
 
-static int __devexit as3676_remove(struct i2c_client *client)
+static int as3676_remove(struct i2c_client *client)
 {
 	struct as3676_record *rd = i2c_get_clientdata(client);
 	int i;
@@ -1649,7 +1649,7 @@ static int __devexit as3676_remove(struct i2c_client *client)
 	return 0;
 }
 
-static int __devinit as3676_probe(struct i2c_client *client,
+static int as3676_probe(struct i2c_client *client,
 		const struct i2c_device_id *id);
 
 static const struct i2c_device_id as3676_idtable[] = {
@@ -1671,12 +1671,12 @@ static struct i2c_driver as3676_driver = {
 		.pm = &as3676_pm,
 	},
 	.probe   = as3676_probe,
-	.remove  = __devexit_p(as3676_remove),
+	.remove  = as3676_remove,
 	.shutdown = as3676_shutdown,
 	.id_table = as3676_idtable,
 };
 
-static int __devinit as3676_probe(struct i2c_client *client,
+static int as3676_probe(struct i2c_client *client,
 		const struct i2c_device_id *id)
 {
 	struct as3676_record *rd = 0;
