@@ -1992,7 +1992,9 @@ static int clearpad_remove(struct platform_device *pdev)
 	struct synaptics_clearpad *this = dev_get_drvdata(&pdev->dev);
 
 	free_irq(this->pdata->irq, &this->pdev->dev);
+#ifdef CONFIG_HAS_EARLYSUSPEND
 	unregister_early_suspend(&this->early_suspend);
+#endif
 	input_unregister_device(this->input);
 	sysfs_remove_group(&this->input->dev.kobj, &synaptics_clearpad_attrs);
 
