@@ -53,7 +53,7 @@ static struct clearpad_bus_data clearpad_i2c_bus_data = {
 	.write		= clearpad_i2c_write,
 };
 
-static int __devinit clearpad_i2c_probe(struct i2c_client *client,
+static int clearpad_i2c_probe(struct i2c_client *client,
 				      const struct i2c_device_id *id)
 {
 	struct clearpad_data clearpad_data = {

@@ -1863,7 +1863,7 @@ static void synaptics_clearpad_late_resume(struct early_suspend *handler)
 }
 #endif
 
-static int __devinit clearpad_probe(struct platform_device *pdev)
+static int clearpad_probe(struct platform_device *pdev)
 {
 	struct clearpad_data *cdata = pdev->dev.platform_data;
 	struct synaptics_clearpad *this;
@@ -1987,7 +1987,7 @@ err_free:
 	return rc;
 }
 
-static int __devexit clearpad_remove(struct platform_device *pdev)
+static int clearpad_remove(struct platform_device *pdev)
 {
 	struct synaptics_clearpad *this = dev_get_drvdata(&pdev->dev);
 
@@ -2020,7 +2020,7 @@ static struct platform_driver clearpad_driver = {
 		.pm	= &synaptics_clearpad_pm,
 	},
 	.probe		= clearpad_probe,
-	.remove		= __devexit_p(clearpad_remove),
+	.remove		= clearpad_remove,
 };
 
 static int __init clearpad_init(void)
