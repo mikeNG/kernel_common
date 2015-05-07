@@ -1495,7 +1495,7 @@ static int as3676_pm_suspend(struct device *dev)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct as3676_record *rd = i2c_get_clientdata(client);
 
-	dev_info(dev, "Suspending AS3676\n");
+	dev_dbg(dev, "Suspending AS3676\n");
 
 	as3676_lock(rd);
 	rd->cmode = AS3676_CMODE_IMMEDIATE;
@@ -1518,7 +1518,7 @@ static int as3676_pm_resume(struct device *dev)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct as3676_record *rd = i2c_get_clientdata(client);
 
-	dev_info(dev, "Resuming AS3676\n");
+	dev_dbg(dev, "Resuming AS3676\n");
 
 	as3676_lock(rd);
 	as3676_restore(rd);
@@ -1551,7 +1551,7 @@ static void as3676_early_suspend(struct early_suspend *handler)
 	struct as3676_record *rd =
 		container_of(handler, struct as3676_record, early_suspend);
 
-	dev_info(&rd->client->dev, "%s\n", __func__);
+	dev_dbg(&rd->client->dev, "%s\n", __func__);
 
 	as3676_lock(rd);
 	rd->cmode = AS3676_CMODE_IMMEDIATE;
@@ -1572,7 +1572,7 @@ static void as3676_late_resume(struct early_suspend *handler)
 	struct as3676_record *rd =
 		container_of(handler, struct as3676_record, early_suspend);
 
-	dev_info(&rd->client->dev, "%s\n", __func__);
+	dev_dbg(&rd->client->dev, "%s\n", __func__);
 
 	as3676_lock(rd);
 	as3676_restore(rd);
