@@ -22,6 +22,8 @@
 #include <mach/gpio.h>
 #include <linux/ctype.h>
 #include <linux/firmware.h>
+#include <linux/slab.h>
+#include <linux/sched.h>
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
 #endif
