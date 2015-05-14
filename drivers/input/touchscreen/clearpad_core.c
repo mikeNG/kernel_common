@@ -24,9 +24,6 @@
 #include <linux/firmware.h>
 #include <linux/slab.h>
 #include <linux/sched.h>
-#ifdef CONFIG_HAS_EARLYSUSPEND
-#include <linux/earlysuspend.h>
-#endif
 #ifdef CONFIG_ARM
 #include <asm/mach-types.h>
 #endif
@@ -282,9 +279,6 @@ struct synaptics_clearpad {
 	struct synaptics_extents extents;
 	int active;
 	int irq_mask;
-#ifdef CONFIG_HAS_EARLYSUSPEND
-	struct early_suspend early_suspend;
-#endif
 	char fwname[SYNAPTICS_STRING_LENGTH + 1];
 	char result_info[SYNAPTICS_STRING_LENGTH + 1];
 	wait_queue_head_t task_none_wq;
@@ -1843,26 +1837,6 @@ static int synaptics_clearpad_pm_resume(struct device *dev)
 	return rc;
 }
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
-static void synaptics_clearpad_early_suspend(struct early_suspend *handler)
-{
-	struct synaptics_clearpad *this =
-	container_of(handler, struct synaptics_clearpad, early_suspend);
-
-	dev_dbg(&this->pdev->dev, "early suspend\n");
-	synaptics_clearpad_pm_suspend(&this->pdev->dev);
-}
-
-static void synaptics_clearpad_late_resume(struct early_suspend *handler)
-{
-	struct synaptics_clearpad *this =
-	container_of(handler, struct synaptics_clearpad, early_suspend);
-
-	dev_dbg(&this->pdev->dev, "late resume\n");
-	synaptics_clearpad_pm_resume(&this->pdev->dev);
-}
-#endif
-
 static int clearpad_probe(struct platform_device *pdev)
 {
 	struct clearpad_data *cdata = pdev->dev.platform_data;
@@ -1944,12 +1918,6 @@ static int clearpad_probe(struct platform_device *pdev)
 	if (rc)
 		goto err_input_unregister;
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
-	this->early_suspend.suspend = synaptics_clearpad_early_suspend;
-	this->early_suspend.resume = synaptics_clearpad_late_resume;
-	register_early_suspend(&this->early_suspend);
-#endif
-
 	/* sysfs */
 	rc = sysfs_create_group(&this->input->dev.kobj,
 				&synaptics_clearpad_attrs);
@@ -1992,9 +1960,6 @@ static int clearpad_remove(struct platform_device *pdev)
 	struct synaptics_clearpad *this = dev_get_drvdata(&pdev->dev);
 
 	free_irq(this->pdata->irq, &this->pdev->dev);
-#ifdef CONFIG_HAS_EARLYSUSPEND
-	unregister_early_suspend(&this->early_suspend);
-#endif
 	input_unregister_device(this->input);
 	sysfs_remove_group(&this->input->dev.kobj, &synaptics_clearpad_attrs);
 
@@ -2009,10 +1974,8 @@ static int clearpad_remove(struct platform_device *pdev)
 
 
 static const struct dev_pm_ops synaptics_clearpad_pm = {
-#ifndef CONFIG_HAS_EARLYSUSPEND
 	.suspend = synaptics_clearpad_pm_suspend,
 	.resume = synaptics_clearpad_pm_resume,
-#endif
 };
 
 static struct platform_driver clearpad_driver = {
