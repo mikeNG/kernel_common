@@ -104,18 +104,7 @@ static struct i2c_driver clearpad_i2c_driver = {
 	.probe		= clearpad_i2c_probe,
 };
 
-static int __init clearpad_i2c_init(void)
-{
-	return i2c_add_driver(&clearpad_i2c_driver);
-}
-
-static void __exit clearpad_i2c_exit(void)
-{
-	i2c_del_driver(&clearpad_i2c_driver);
-}
+module_i2c_driver(clearpad_i2c_driver);
 
 MODULE_DESCRIPTION(CLEARPADI2C_NAME "ClearPad I2C Driver");
 MODULE_LICENSE("GPL v2");
-
-module_init(clearpad_i2c_init);
-module_exit(clearpad_i2c_exit);
