@@ -1842,18 +1842,7 @@ error:
 	return err;
 }
 
-static int __init as3676_init(void)
-{
-	return i2c_add_driver(&as3676_driver);
-}
-
-static void __exit as3676_exit(void)
-{
-	i2c_del_driver(&as3676_driver);
-}
-
-module_init(as3676_init);
-module_exit(as3676_exit);
+module_i2c_driver(as3676_driver);
 
 MODULE_AUTHOR("Courtney Cavin <courtney.cavin@sonyericsson.com>");
 MODULE_DESCRIPTION("AS3676 I2C LED driver");
