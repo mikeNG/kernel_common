@@ -24,6 +24,10 @@
 #include <linux/firmware.h>
 #include <linux/slab.h>
 #include <linux/sched.h>
+#ifdef CONFIG_FB
+#include <linux/notifier.h>
+#include <linux/fb.h>
+#endif
 #ifdef CONFIG_ARM
 #include <asm/mach-types.h>
 #endif
@@ -279,6 +283,10 @@ struct synaptics_clearpad {
 	struct synaptics_extents extents;
 	int active;
 	int irq_mask;
+#ifdef CONFIG_FB
+	struct notifier_block fb_notif;
+#endif
+	bool suspended;
 	char fwname[SYNAPTICS_STRING_LENGTH + 1];
 	char result_info[SYNAPTICS_STRING_LENGTH + 1];
 	wait_queue_head_t task_none_wq;
@@ -1803,6 +1811,9 @@ static int synaptics_clearpad_pm_suspend(struct device *dev)
 	int rc = 0;
 	bool go_suspend;
 
+	if (this->suspended)
+		return 0;
+
 	LOCK(this);
 	go_suspend = (this->task != SYN_TASK_FLASH);
 	if (go_suspend)
@@ -1815,6 +1826,9 @@ static int synaptics_clearpad_pm_suspend(struct device *dev)
 	UNLOCK(this);
 
 	rc = synaptics_clearpad_set_power(this);
+
+	this->suspended = true;
+
 	return rc;
 }
 
@@ -1823,6 +1837,9 @@ static int synaptics_clearpad_pm_resume(struct device *dev)
 	struct synaptics_clearpad *this = dev_get_drvdata(dev);
 	int rc = 0;
 	bool go_resume;
+
+	if (!this->suspended)
+		return 0;
 
 	LOCK(this);
 	go_resume = !!(this->active & (SYN_STANDBY | SYN_STANDBY_AFTER_FLASH));
@@ -1834,8 +1851,34 @@ static int synaptics_clearpad_pm_resume(struct device *dev)
 	UNLOCK(this);
 
 	rc = synaptics_clearpad_set_power(this);
+
+	this->suspended = false;
+
 	return rc;
 }
+
+#ifdef CONFIG_FB
+static int fb_notifier_callback(struct notifier_block *self,
+				unsigned long event, void *data)
+{
+	struct fb_event *evdata = data;
+	int *blank;
+	struct synaptics_clearpad *this =
+		container_of(self, struct synaptics_clearpad, fb_notif);
+
+	if (evdata && evdata->data) {
+		if (event == FB_EVENT_BLANK) {
+			blank = evdata->data;
+			if (*blank == FB_BLANK_UNBLANK)
+				synaptics_clearpad_pm_resume(&this->pdev->dev);
+			else if (*blank == FB_BLANK_POWERDOWN)
+				synaptics_clearpad_pm_suspend(&this->pdev->dev);
+		}
+	}
+
+	return 0;
+}
+#endif
 
 static int clearpad_probe(struct platform_device *pdev)
 {
@@ -1918,11 +1961,20 @@ static int clearpad_probe(struct platform_device *pdev)
 	if (rc)
 		goto err_input_unregister;
 
+#ifdef CONFIG_FB
+	this->fb_notif.notifier_call = fb_notifier_callback;
+	rc = fb_register_client(&this->fb_notif);
+	if (rc) {
+		dev_err(&this->pdev->dev, "failed to register fb_notifier\n");
+		goto err_input_unregister;
+	}
+#endif
+
 	/* sysfs */
 	rc = sysfs_create_group(&this->input->dev.kobj,
 				&synaptics_clearpad_attrs);
 	if (rc)
-		goto err_input_unregister;
+		goto err_fb_notif;
 
 	LOCK(this);
 	rc = request_irq(this->pdata->irq, &synaptics_clearpad_irq,
@@ -1933,13 +1985,17 @@ static int clearpad_probe(struct platform_device *pdev)
 		dev_err(&this->pdev->dev,
 		       "irq %d busy?\n", this->pdata->irq);
 		UNLOCK(this);
-		goto err_input_unregister;
+		goto err_fb_notif;
 	}
 	disable_irq(this->pdata->irq);
 	UNLOCK(this);
 
 	return 0;
 
+err_fb_notif:
+#ifdef CONFIG_FB
+	fb_unregister_client(&this->fb_notif);
+#endif
 err_input_unregister:
 	input_set_drvdata(this->input, NULL);
 	input_unregister_device(this->input);
@@ -1960,6 +2016,9 @@ static int clearpad_remove(struct platform_device *pdev)
 	struct synaptics_clearpad *this = dev_get_drvdata(&pdev->dev);
 
 	free_irq(this->pdata->irq, &this->pdev->dev);
+#ifdef CONFIG_FB
+	fb_unregister_client(&this->fb_notif);
+#endif
 	input_unregister_device(this->input);
 	sysfs_remove_group(&this->input->dev.kobj, &synaptics_clearpad_attrs);
 
@@ -1974,8 +2033,10 @@ static int clearpad_remove(struct platform_device *pdev)
 
 
 static const struct dev_pm_ops synaptics_clearpad_pm = {
+#ifndef CONFIG_FB
 	.suspend = synaptics_clearpad_pm_suspend,
 	.resume = synaptics_clearpad_pm_resume,
+#endif
 };
 
 static struct platform_driver clearpad_driver = {
