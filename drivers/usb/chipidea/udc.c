@@ -1917,6 +1917,12 @@ static int udc_start(struct ci_hdrc *ci)
 
 	ci->gadget.ep0 = &ci->ep0in->ep;
 
+	if (ci->usb_phy) {
+		retval = otg_set_peripheral(ci->usb_phy->otg, &ci->gadget);
+		if (retval)
+			goto destroy_eps;
+	}
+
 	retval = usb_add_gadget_udc(dev, &ci->gadget);
 	if (retval)
 		goto destroy_eps;
