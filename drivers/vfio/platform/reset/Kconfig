@@ -13,3 +13,12 @@ config VFIO_PLATFORM_AMDXGBE_RESET
 	  Enables the VFIO platform driver to handle reset for AMD XGBE
 
 	  If you don't know what to do here, say N.
+
+config VFIO_PLATFORM_QCOMHIDMA_RESET
+	tristate "VFIO support for Qualcomm Technologies HIDMA reset"
+	depends on VFIO_PLATFORM
+	help
+	  Enables the VFIO platform driver to handle reset for Qualcomm Technologies
+	  HIDMA Channel.
+
+	  If you don't know what to do here, say N.
