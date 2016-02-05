@@ -58,6 +58,7 @@ struct vfio_platform_device {
 	struct mutex			igate;
 	struct module			*parent_module;
 	const char			*compat;
+	const char			*acpihid;
 	struct module			*reset_module;
 	struct device			*device;
 
@@ -79,6 +80,7 @@ typedef int (*vfio_platform_reset_fn_t)(struct vfio_platform_device *vdev);
 struct vfio_platform_reset_node {
 	struct list_head link;
 	char *compat;
+	char *acpihid;
 	struct module *owner;
 	vfio_platform_reset_fn_t reset;
 };
@@ -98,27 +100,30 @@ extern int vfio_platform_set_irqs_ioctl(struct vfio_platform_device *vdev,
 
 extern void __vfio_platform_register_reset(struct vfio_platform_reset_node *n);
 extern void vfio_platform_unregister_reset(const char *compat,
+					   const char *acpihid,
 					   vfio_platform_reset_fn_t fn);
-#define vfio_platform_register_reset(__compat, __reset)		\
-static struct vfio_platform_reset_node __reset ## _node = {	\
-	.owner = THIS_MODULE,					\
-	.compat = __compat,					\
-	.reset = __reset,					\
-};								\
+
+#define vfio_platform_register_reset(__compat, __acpihid, __reset)	\
+static struct vfio_platform_reset_node __reset ## _node = {		\
+	.owner = THIS_MODULE,						\
+	.compat = __compat,						\
+	.acpihid = __acpihid,						\
+	.reset = __reset,						\
+};									\
 __vfio_platform_register_reset(&__reset ## _node)
 
-#define module_vfio_reset_handler(compat, reset)		\
-MODULE_ALIAS("vfio-reset:" compat);				\
-static int __init reset ## _module_init(void)			\
-{								\
-	vfio_platform_register_reset(compat, reset);		\
-	return 0;						\
-};								\
-static void __exit reset ## _module_exit(void)			\
-{								\
-	vfio_platform_unregister_reset(compat, reset);		\
-};								\
-module_init(reset ## _module_init);				\
+#define module_vfio_reset_handler(compat, acpihid, reset)		\
+MODULE_ALIAS("vfio-reset:" compat);					\
+static int __init reset ## _module_init(void)				\
+{									\
+	vfio_platform_register_reset(compat, acpihid, reset);		\
+	return 0;							\
+};									\
+static void __exit reset ## _module_exit(void)				\
+{									\
+	vfio_platform_unregister_reset(compat, acpihid, reset);		\
+};									\
+module_init(reset ## _module_init);					\
 module_exit(reset ## _module_exit)
 
 #endif /* VFIO_PLATFORM_PRIVATE_H */
