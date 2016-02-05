@@ -13,6 +13,7 @@
  */
 
 #include <linux/device.h>
+#include <linux/acpi.h>
 #include <linux/iommu.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
@@ -31,14 +32,22 @@ static LIST_HEAD(reset_list);
 static DEFINE_MUTEX(driver_lock);
 
 static vfio_platform_reset_fn_t vfio_platform_lookup_reset(const char *compat,
-					struct module **module)
+				  const char *acpihid, struct module **module)
 {
 	struct vfio_platform_reset_node *iter;
 	vfio_platform_reset_fn_t reset_fn = NULL;
 
 	mutex_lock(&driver_lock);
 	list_for_each_entry(iter, &reset_list, link) {
-		if (!strcmp(iter->compat, compat) &&
+		if (acpihid && iter->acpihid &&
+		    !strcmp(iter->acpihid, acpihid) &&
+			try_module_get(iter->owner)) {
+			*module = iter->owner;
+			reset_fn = iter->reset;
+			break;
+		}
+		if (compat && iter->compat &&
+		    !strcmp(iter->compat, compat) &&
 			try_module_get(iter->owner)) {
 			*module = iter->owner;
 			reset_fn = iter->reset;
@@ -51,11 +60,12 @@ static vfio_platform_reset_fn_t vfio_platform_lookup_reset(const char *compat,
 
 static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
 {
-	vdev->reset = vfio_platform_lookup_reset(vdev->compat,
-						&vdev->reset_module);
+	vdev->reset = vfio_platform_lookup_reset(vdev->compat, vdev->acpihid,
+						 &vdev->reset_module);
 	if (!vdev->reset) {
 		request_module("vfio-reset:%s", vdev->compat);
 		vdev->reset = vfio_platform_lookup_reset(vdev->compat,
+							 vdev->acpihid,
 							 &vdev->reset_module);
 	}
 }
@@ -544,6 +554,46 @@ static const struct vfio_device_ops vfio_platform_ops = {
 	.mmap		= vfio_platform_mmap,
 };
 
+#ifdef CONFIG_ACPI
+int vfio_platform_probe_acpi(struct vfio_platform_device *vdev,
+			     struct device *dev)
+{
+	struct acpi_device *adev = ACPI_COMPANION(dev);
+
+	if (!adev)
+		return -EINVAL;
+
+	vdev->acpihid = acpi_device_hid(adev);
+	if (!vdev->acpihid) {
+		pr_err("VFIO: cannot find ACPI HID for %s\n",
+		       vdev->name);
+		return -EINVAL;
+	}
+	return 0;
+}
+#else
+int vfio_platform_probe_acpi(struct vfio_platform_device *vdev,
+			     struct device *dev)
+{
+	return -EINVAL;
+}
+#endif
+
+int vfio_platform_probe_of(struct vfio_platform_device *vdev,
+			   struct device *dev)
+{
+	int ret;
+
+	ret = device_property_read_string(dev, "compatible",
+					  &vdev->compat);
+	if (ret) {
+		pr_err("VFIO: cannot retrieve compat for %s\n",
+			vdev->name);
+		return -EINVAL;
+	}
+	return 0;
+}
+
 int vfio_platform_probe_common(struct vfio_platform_device *vdev,
 			       struct device *dev)
 {
@@ -553,14 +603,14 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
 	if (!vdev)
 		return -EINVAL;
 
-	ret = device_property_read_string(dev, "compatible", &vdev->compat);
-	if (ret) {
-		pr_err("VFIO: cannot retrieve compat for %s\n", vdev->name);
-		return -EINVAL;
-	}
+	ret = vfio_platform_probe_acpi(vdev, dev);
+	if (ret)
+		ret = vfio_platform_probe_of(vdev, dev);
+
+	if (ret)
+		return ret;
 
 	vdev->device = dev;
-
 	group = iommu_group_get(dev);
 	if (!group) {
 		pr_err("VFIO: No IOMMU group for device %s\n", vdev->name);
@@ -605,13 +655,21 @@ void __vfio_platform_register_reset(struct vfio_platform_reset_node *node)
 EXPORT_SYMBOL_GPL(__vfio_platform_register_reset);
 
 void vfio_platform_unregister_reset(const char *compat,
+				    const char *acpihid,
 				    vfio_platform_reset_fn_t fn)
 {
 	struct vfio_platform_reset_node *iter, *temp;
 
 	mutex_lock(&driver_lock);
 	list_for_each_entry_safe(iter, temp, &reset_list, link) {
-		if (!strcmp(iter->compat, compat) && (iter->reset == fn)) {
+		if (acpihid && iter->acpihid &&
+		    !strcmp(iter->acpihid, acpihid) && (iter->reset == fn)) {
+			list_del(&iter->link);
+			break;
+		}
+
+		if (compat && iter->compat &&
+		    !strcmp(iter->compat, compat) && (iter->reset == fn)) {
 			list_del(&iter->link);
 			break;
 		}
