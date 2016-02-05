@@ -37,7 +37,7 @@ struct hidma_tre {
 	atomic_t allocated;		/* if this channel is allocated	    */
 	bool queued;			/* flag whether this is pending     */
 	u16 status;			/* status			    */
-	u32 chidx;			/* index of the tre		    */
+	u32 idx;			/* index of the tre		    */
 	u32 dma_sig;			/* signature of the tre		    */
 	const char *dev_name;		/* name of the device		    */
 	void (*callback)(void *data);	/* requester callback		    */
