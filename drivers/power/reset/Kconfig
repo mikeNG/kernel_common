@@ -173,5 +173,11 @@ config POWER_RESET_ZX
 	help
 	  Reboot support for ZTE SoCs.
 
+config POWER_RESET_PROCCOMM
+	tristate "ProcComm reset driver"
+	depends on QCOM_PROC_COMM
+	help
+	  Reboot support for ProcComm.
+
 endif
 
