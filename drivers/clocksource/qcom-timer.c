@@ -35,6 +35,7 @@
 #define TIMER_ENABLE_EN			BIT(0)
 #define TIMER_CLEAR			0x000C
 #define DGT_CLK_CTL			0x10
+#define DGT_CLK_CTL_DIV_2		0x1
 #define DGT_CLK_CTL_DIV_4		0x3
 #define TIMER_STS_GPT0_CLR_PEND		BIT(10)
 
@@ -228,6 +229,7 @@ static void __init msm_dt_timer_init(struct device_node *np)
 	u32 percpu_offset;
 	void __iomem *base;
 	void __iomem *cpu0_base;
+	bool broken_divide;
 
 	base = of_iomap(np, 0);
 	if (!base) {
@@ -262,11 +264,17 @@ static void __init msm_dt_timer_init(struct device_node *np)
 		return;
 	}
 
+	broken_divide = of_property_read_bool(np, "broken-divide");
+
 	event_base = base + 0x4;
 	sts_base = base + 0x88;
 	source_base = cpu0_base + 0x24;
 	freq /= 4;
-	writel_relaxed(DGT_CLK_CTL_DIV_4, source_base + DGT_CLK_CTL);
+
+	if (broken_divide)
+		writel_relaxed(DGT_CLK_CTL_DIV_2, source_base + DGT_CLK_CTL);
+	else
+		writel_relaxed(DGT_CLK_CTL_DIV_4, source_base + DGT_CLK_CTL);
 
 	msm_timer_init(freq, 32, irq, !!percpu_offset);
 }
