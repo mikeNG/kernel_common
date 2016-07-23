@@ -266,7 +266,7 @@ static void __init msm_dt_timer_init(struct device_node *np)
 	sts_base = base + 0x88;
 	source_base = cpu0_base + 0x24;
 	freq /= 4;
-	writel_relaxed(DGT_CLK_CTL_DIV_4, source_base + DGT_CLK_CTL);
+	//writel_relaxed(DGT_CLK_CTL_DIV_4, source_base + DGT_CLK_CTL);
 
 	msm_timer_init(freq, 32, irq, !!percpu_offset);
 }
