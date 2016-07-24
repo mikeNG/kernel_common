@@ -49,3 +49,10 @@ config QCOM_SMD_RPM
 
 	  Say M here if you want to include support for the Qualcomm RPM as a
 	  module. This will build a module called "qcom-smd-rpm".
+
+config QCOM_PROC_COMM
+	bool "Proc-Comm RPC Interface"
+	depends on ARCH_QCOM
+	help
+	  Enables a lightweight communications interface to the
+	  baseband processor.
