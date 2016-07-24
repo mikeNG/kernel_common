@@ -505,6 +505,13 @@ config REGULATOR_PFUZE100
 	  Say y here to support the regulators found on the Freescale
 	  PFUZE100/PFUZE200 PMIC.
 
+config REGULATOR_PROC_COMM
+	tristate "MSM ProcComm regulator"
+	depends on QCOM_PROC_COMM
+	help
+	  Enable regulator framework support for regulators and footswitches
+	  managed by PMLIB on the modem, and controlled through proccomm calls.
+
 config REGULATOR_PWM
 	tristate "PWM voltage regulator"
 	depends on PWM
