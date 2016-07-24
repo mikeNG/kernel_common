@@ -7,6 +7,13 @@ config PINCTRL_MSM
 	select GENERIC_PINCONF
 	select GPIOLIB_IRQCHIP
 
+config PINCTRL_MSM_V1
+	bool
+	select PINMUX
+	select PINCONF
+	select GENERIC_PINCONF
+	select GPIOLIB_IRQCHIP
+
 config PINCTRL_APQ8064
 	tristate "Qualcomm APQ8064 pin controller driver"
 	depends on GPIOLIB && OF
@@ -38,6 +45,14 @@ config PINCTRL_MSM8660
 	help
 	  This is the pinctrl, pinmux, pinconf and gpiolib driver for the
 	  Qualcomm TLMM block found in the Qualcomm 8660 platform.
+
+config PINCTRL_MSM7X30
+	tristate "Qualcomm 7X30 pin controller driver"
+	depends on QCOM_PROC_COMM && GPIOLIB && OF
+	select PINCTRL_MSM_V1
+	help
+	  This is the pinctrl, pinmux, pinconf and gpiolib driver for the
+	  Qualcomm TLMM block found in the Qualcomm 7X30 platform.
 
 config PINCTRL_MSM8960
 	tristate "Qualcomm 8960 pin controller driver"
