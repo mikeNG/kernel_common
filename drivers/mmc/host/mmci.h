@@ -238,6 +238,7 @@ struct mmci_host {
 	struct dma_chan		*dma_tx_channel;
 	struct dma_async_tx_descriptor	*dma_desc_current;
 	struct mmci_host_next	next_data;
+	unsigned int		crci;
 
 #define dma_inprogress(host)	((host)->dma_current)
 #else

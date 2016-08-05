@@ -594,6 +594,13 @@ static int __mmci_dma_prep_data(struct mmci_host *host, struct mmc_data *data,
 		chan = host->dma_tx_channel;
 	}
 
+	if (host->crci) {
+		conf.src_maxburst = variant->fifosize;
+		conf.dst_maxburst = variant->fifosize;
+		conf.device_fc = true;
+		conf.slave_id = host->crci;
+	}
+
 	/* If there's no DMA channel, fall back to PIO */
 	if (!chan)
 		return -EINVAL;
@@ -1502,6 +1509,8 @@ static int mmci_of_parse(struct device_node *np, struct mmc_host *mmc)
 		mmc->caps |= MMC_CAP_MMC_HIGHSPEED;
 	if (of_get_property(np, "mmc-cap-sd-highspeed", NULL))
 		mmc->caps |= MMC_CAP_SD_HIGHSPEED;
+
+	of_property_read_u32(np, "qcom,crci", &host->crci);
 
 	return 0;
 }
