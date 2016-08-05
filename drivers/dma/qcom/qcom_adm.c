@@ -37,7 +37,11 @@
 #define ADM_CHAN_MULTI			0x4
 #define ADM_CI_MULTI			0x4
 #define ADM_CRCI_MULTI			0x4
+#if 1
+#define ADM_EE_MULTI			0x400
+#else
 #define ADM_EE_MULTI			0x800
+#endif
 #define ADM_CHAN_OFFS(chan)		(ADM_CHAN_MULTI * chan)
 #define ADM_EE_OFFS(ee)			(ADM_EE_MULTI * ee)
 #define ADM_CHAN_EE_OFFS(chan, ee)	(ADM_CHAN_OFFS(chan) + ADM_EE_OFFS(ee))
@@ -171,10 +175,12 @@ struct adm_device {
 	struct clk *core_clk;
 	struct clk *iface_clk;
 
+#if 0
 	struct reset_control *clk_reset;
 	struct reset_control *c0_reset;
 	struct reset_control *c1_reset;
 	struct reset_control *c2_reset;
+#endif
 	int irq;
 };
 
@@ -513,12 +519,14 @@ static void adm_start_dma(struct adm_chan *achan)
 	achan->error = 0;
 
 	if (!achan->initialized) {
+#if 0
 		/* enable interrupts */
 		writel(ADM_CH_CONF_SHADOW_EN |
 		       ADM_CH_CONF_PERM_MPU_CONF |
 		       ADM_CH_CONF_MPU_DISABLE |
 		       ADM_CH_CONF_SEC_DOMAIN(adev->ee),
 		       adev->regs + ADM_CH_CONF(achan->id));
+#endif
 
 		writel(ADM_CH_RSLT_CONF_IRQ_EN | ADM_CH_RSLT_CONF_FLUSH_EN,
 			adev->regs + ADM_CH_RSLT_CONF(achan->id, adev->ee));
@@ -526,11 +534,13 @@ static void adm_start_dma(struct adm_chan *achan)
 		achan->initialized = 1;
 	}
 
+#if 0
 	/* set the crci block size if this transaction requires CRCI */
 	if (async_desc->crci) {
 		writel(async_desc->mux | async_desc->blk_size,
 			adev->regs + ADM_CRCI_CTL(async_desc->crci, adev->ee));
 	}
+#endif
 
 	/* make sure IRQ enable doesn't get reordered */
 	wmb();
@@ -734,6 +744,7 @@ static int adm_dma_probe(struct platform_device *pdev)
 		goto err_disable_core_clk;
 	}
 
+#if 0
 	adev->clk_reset = devm_reset_control_get(&pdev->dev, "clk");
 	if (IS_ERR(adev->clk_reset)) {
 		dev_err(adev->dev, "failed to get ADM0 reset\n");
@@ -771,6 +782,7 @@ static int adm_dma_probe(struct platform_device *pdev)
 	reset_control_deassert(adev->c0_reset);
 	reset_control_deassert(adev->c1_reset);
 	reset_control_deassert(adev->c2_reset);
+#endif
 
 	adev->channels = devm_kcalloc(adev->dev, ADM_MAX_CHANNELS,
 				sizeof(*adev->channels), GFP_KERNEL);
@@ -786,6 +798,7 @@ static int adm_dma_probe(struct platform_device *pdev)
 	for (i = 0; i < ADM_MAX_CHANNELS; i++)
 		adm_channel_init(adev, &adev->channels[i], i);
 
+#if 0
 	/* reset CRCIs */
 	for (i = 0; i < 16; i++)
 		writel(ADM_CRCI_CTL_RST, adev->regs +
@@ -800,6 +813,7 @@ static int adm_dma_probe(struct platform_device *pdev)
 		ADM_CI_BURST_8_WORDS, adev->regs + ADM_CI_CONF(2));
 	writel(ADM_GP_CTL_LP_EN | ADM_GP_CTL_LP_CNT(0xf),
 		adev->regs + ADM_GP_CTL);
+#endif
 
 	ret = devm_request_irq(adev->dev, adev->irq, adm_dma_irq,
 			0, "adm_dma", adev);
