@@ -286,6 +286,66 @@ static int __raw_remote_sfpb_get_hw_spinlocks_element(
 
 /* end sfpb implementation -------------------------------------------------- */
 
+/* dekkers implementation --------------------------------------------------- */
+static char *dekkers_compatible_string = "qcom,ipc-spinlock-dekkers";
+
+#define DEK_LOCK_REQUEST		1
+#define DEK_LOCK_YIELD			(!DEK_LOCK_REQUEST)
+#define DEK_YIELD_TURN_SELF		0
+
+static void __raw_remote_dek_spin_lock(raw_remote_spinlock_t *lock)
+{
+	lock->dek.self_lock = DEK_LOCK_REQUEST;
+
+	while (lock->dek.other_lock) {
+
+		if (lock->dek.next_yield == DEK_YIELD_TURN_SELF)
+			lock->dek.self_lock = DEK_LOCK_YIELD;
+
+		while (lock->dek.other_lock)
+			;
+
+		lock->dek.self_lock = DEK_LOCK_REQUEST;
+	}
+	lock->dek.next_yield = DEK_YIELD_TURN_SELF;
+
+	smp_mb();
+}
+
+static int __raw_remote_dek_spin_trylock(raw_remote_spinlock_t *lock)
+{
+	lock->dek.self_lock = DEK_LOCK_REQUEST;
+
+	if (lock->dek.other_lock) {
+		lock->dek.self_lock = DEK_LOCK_YIELD;
+		return 0;
+	}
+
+	lock->dek.next_yield = DEK_YIELD_TURN_SELF;
+
+	smp_mb();
+	return 1;
+}
+
+static void __raw_remote_dek_spin_unlock(raw_remote_spinlock_t *lock)
+{
+	smp_mb();
+
+	lock->dek.self_lock = DEK_LOCK_YIELD;
+}
+
+static int __raw_remote_dek_spin_release(raw_remote_spinlock_t *lock,
+		uint32_t pid)
+{
+	return -EINVAL;
+}
+
+static int __raw_remote_dek_spin_owner(raw_remote_spinlock_t *lock)
+{
+	return -ENODEV;
+}
+/* end dekkers implementation ----------------------------------------------- */
+
 /* common spinlock API ------------------------------------------------------ */
 /**
  * Release spinlock if it is owned by @pid.
@@ -383,6 +443,17 @@ static void initialize_ops(void)
 		current_ops.trylock = __raw_remote_ex_spin_trylock;
 		current_ops.release = __raw_remote_gen_spin_release;
 		current_ops.owner = __raw_remote_gen_spin_owner;
+		is_hw_lock_type = 0;
+		return;
+	}
+
+	node = of_find_compatible_node(NULL, NULL, dekkers_compatible_string);
+	if (node && dt_node_is_valid(node)) {
+		current_ops.lock = __raw_remote_dek_spin_lock;
+		current_ops.unlock = __raw_remote_dek_spin_unlock;
+		current_ops.trylock = __raw_remote_dek_spin_trylock;
+		current_ops.release = __raw_remote_dek_spin_release;
+		current_ops.owner = __raw_remote_dek_spin_owner;
 		is_hw_lock_type = 0;
 		return;
 	}

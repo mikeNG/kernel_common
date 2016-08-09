@@ -27,9 +27,16 @@
 #define REMOTE_SPINLOCK_TID_START REMOTE_SPINLOCK_NUM_PID
 
 /* Remote spinlock definitions. */
+struct dek_spinlock {
+	volatile uint8_t self_lock;
+	volatile uint8_t other_lock;
+	volatile uint8_t next_yield;
+	uint8_t pad;
+};
 
 typedef struct {
 	volatile uint32_t lock;
+	struct dek_spinlock dek;
 } raw_remote_spinlock_t;
 
 typedef raw_remote_spinlock_t *_remote_spinlock_t;
