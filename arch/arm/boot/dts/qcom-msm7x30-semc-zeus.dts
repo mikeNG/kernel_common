@@ -1,0 +1,24 @@
+#include "qcom-msm7x30-semc-mogami.dtsi"
+
+#include <dt-bindings/input/input.h>
+
+/ {
+	model = "SEMC Xperia Play";
+};
+
+&pmicintc {
+	keypad@148 {
+		linux,keymap = <
+			MATRIX_KEY(7, 0, KEY_VOLUMEUP)
+			MATRIX_KEY(7, 1, KEY_VOLUMEDOWN)
+			MATRIX_KEY(7, 2, BTN_SELECT)
+			MATRIX_KEY(7, 3, KEY_ENTER)
+			>;
+		keypad,num-rows = <8>;
+		keypad,num-columns = <4>;
+		wakeup-source;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&pm8058_keypad_gpios>;
+	};
+};

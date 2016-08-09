@@ -1,0 +1,31 @@
+#include "qcom-msm7x30-semc-mogami.dtsi"
+
+#include <dt-bindings/input/input.h>
+
+/ {
+	model = "SEMC Xperia Ray";
+};
+
+&pmicintc {
+	keypad@148 {
+		linux,keymap = <
+			MATRIX_KEY(0, 0, KEY_BACK)
+			MATRIX_KEY(0, 1, KEY_HOME)
+			MATRIX_KEY(0, 2, KEY_MENU)
+			MATRIX_KEY(0, 3, KEY_VOLUMEUP)
+			MATRIX_KEY(0, 4, KEY_VOLUMEDOWN)
+			>;
+		keypad,num-rows = <1>;
+		keypad,num-columns = <5>;
+		wakeup-source;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&pm8058_keypad_gpios>;
+	};
+};
+
+&sdc4_gpios {
+	sdc4_clkdat {
+		drive-strength = <4>;
+	};
+};

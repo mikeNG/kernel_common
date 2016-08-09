@@ -1,0 +1,99 @@
+#include "qcom-msm7x30.dtsi"
+
+&ldo6 {
+	regulator-max-microvolt = <3500000>;
+};
+
+&ldo11 {
+	regulator-max-microvolt = <2800000>;
+};
+
+&ldo13 {
+	regulator-min-microvolt = <1800000>;
+};
+
+&ldo15 {
+	regulator-min-microvolt = <2850000>;
+};
+
+&ldo16 {
+	regulator-max-microvolt = <3000000>;
+};
+
+&ldo20 {
+	regulator-max-microvolt = <3050000>;
+};
+
+&pm8058_gpio {
+	pm8058_keypad_gpios: pm8058_keypad_gpios {
+		kypd_sns {
+			pins = "gpio1", "gpio2", "gpio3", "gpio4", "gpio5";
+			function = "normal";
+			input-enable;
+			bias-pull-up;
+			qcom,pull-up-strength = <PMIC_GPIO_PULL_UP_31P5>;
+			power-source = <PM8058_GPIO_S3>;
+			qcom,drive-strength = <PMIC_GPIO_STRENGTH_NO>;
+			drive-push-pull;
+		};
+
+		kypd_drv {
+			pins = "gpio9", "gpio10", "gpio11", "gpio12", "gpio13";
+			function = "func1";
+			drive-open-drain;
+			output-low;
+			bias-disable;
+			power-source = <PM8058_GPIO_S3>;
+			qcom,drive-strength = <PMIC_GPIO_STRENGTH_LOW>;
+		};
+	};
+
+	pm8058_sdc4_gpios: pm8058_sdc4_gpios {
+		sd_det {
+			pins = "gpio22";
+			bias-pull-none;
+			/delete-property/ qcom,pull-up-strength;
+		};
+	};
+};
+
+&tlmm {
+	sdc4_gpios: sdc4_gpios {
+		sdc4_clk {
+			pins = "gpio58";
+			drive-strength = <8>;
+		};
+
+		sdc4_clkdat {
+			pins = "gpio59", "gpio60", "gpio61", "gpio62", "gpio63";
+			bias-pull-none;
+		};
+	};
+
+	sdc4_sleep_gpios: sdc4_sleep_gpios {
+		sdc4_clk {
+			pins = "gpio58";
+			function = "peripheral";
+			bias-pull-down;
+			drive-strength = <2>;
+		};
+
+		sdc4_clkdat {
+			pins = "gpio59", "gpio60", "gpio61", "gpio62", "gpio63";
+			function = "peripheral";
+			bias-pull-down;
+			drive-strength = <2>;
+		};
+	};
+};
+
+/* External micro SD card */
+&sdcc4 {
+	status = "ok";
+	cd-gpios = <&pm8058_gpio 22 0>;
+	cd-inverted;
+
+	pinctrl-names	= "default", "sleep";
+	pinctrl-1	= <&sdc4_sleep_gpios>,
+			  <&pm8058_sdc4_gpios>;
+};
