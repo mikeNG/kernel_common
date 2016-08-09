@@ -1,0 +1,10 @@
+#include "qcom-msm7x30-semc.dtsi"
+
+/ {
+	memory {
+		device_type = "memory";
+		reg =	<0x00200000 0X03C00000>,
+			<0x07400000 0x08C00000>,
+			<0X40000000 0X10000000>;
+	};
+};

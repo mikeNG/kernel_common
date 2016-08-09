@@ -1,0 +1,5 @@
+#include "qcom-msm7x30-semc-mogami.dtsi"
+
+/ {
+	model = "SEMC Live with Walkman";
+};
