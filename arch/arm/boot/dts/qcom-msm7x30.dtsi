@@ -1,0 +1,425 @@
+/dts-v1/;
+
+#include <dt-bindings/clock/qcom,gcc-msm7x30.h>
+#include <dt-bindings/reset/qcom,gcc-msm7x30.h>
+#include <dt-bindings/interrupt-controller/irq.h>
+#include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
+
+/include/ "skeleton.dtsi"
+
+#include "qcom-msm7x30-regulators.dtsi"
+
+/ {
+	model = "Qualcomm MSM7x30";
+	compatible = "qcom,msm7x30";
+	interrupt-parent = <&intc>;
+
+	cpu-pmu {
+		compatible = "qcom,scorpion-pmu";
+		interrupts = <9 0x304>;
+	};
+
+	soc: soc {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+		compatible = "simple-bus";
+
+		intc: interrupt-controller@C0080000 {
+			compatible = "qcom,msm-vic";
+			interrupt-controller;
+			#interrupt-cells = <2>;
+			reg = <0xC0080000 0x1000>;
+			num-irqs = <128>;
+			smsm-irqs = < 43  1  44  2  45  3  60  4
+				      53  5  94  6  95  7  98  8
+				      99  9  20 10  67 11  69 12
+				      71 13  68 14  70 15  72 16
+				      73 17  74 18  59 19
+				      41 21  40 22  55 23  56 24
+				      57 25  60 26  76 27  75 28
+				     101 29 100 30  97 31  96 32
+				      50 0xff 51 0xff 22 0xff 23 0xff
+				      27 0xff  1 0xff  0 0xff 21 0xff>;
+		};
+
+		timer@C0100000 {
+			compatible = "qcom,scss-timer", "qcom,msm-timer";
+			interrupts = <0 0x301>,
+				     <1 0x301>,
+				     <2 0x301>;
+			reg = <0xC0100000 0x100>;
+			clock-frequency = <24576000>,
+					  <32768>;
+			cpu-offset = <0x0>;
+		};
+
+		apcs: syscon@C0182000 {
+			compatible = "syscon";
+			reg = <0xC0182000 0x1000>;
+		};
+
+		pcom: proccomm@00100000 {
+			compatible = "qcom,proccomm";
+			reg = <0x00100000 0x100000>;
+			reg-names = "shared_ram";
+
+			qcom,ipc = <&apcs 8 6>;
+
+			reset {
+				compatible = "qcom,proccomm-reset";
+			};
+		};
+
+		gcc: clock-controller@AB800000 {
+			compatible = "qcom,gcc-msm7x30";
+			reg = <0xAB800000 0x1000>,
+			      <0xABA01000 0x1000>;
+			#clock-cells = <1>;
+			#reset-cells = <1>;
+		};
+
+		tlmm: pinctrl@AC001000 {
+			compatible = "qcom,msm7x30-pinctrl";
+			reg = <0xAC001000 0x1000>,
+			      <0xAC101000 0x1000>;
+			interrupts = <50 IRQ_TYPE_NONE>, <51 IRQ_TYPE_NONE>;
+
+			gpio-controller;
+			#gpio-cells = <2>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
+		};
+
+		adm_dma: dma@AC400000 {
+			compatible = "qcom,adm";
+			reg = <0xAC400000 0x1000>;
+			interrupts = <79 IRQ_TYPE_NONE>;
+			#dma-cells = <1>;
+
+			clocks = <&gcc ADM_CLK>, <&gcc ADM_P_CLK>;
+			clock-names = "core", "iface";
+
+			qcom,ee = <2>;
+		};
+
+		/* MSM7X30 does not have VDDCX */
+		vusb_fixed: vusb-regulator {
+			compatible = "regulator-fixed";
+			regulator-name = "USB VDDCX";
+			regulator-min-microvolt = <1320000>;
+			regulator-max-microvolt = <1320000>;
+			regulator-always-on;
+		};
+
+		usb1_phy: phy@A3600000 {
+			compatible	= "qcom,usb-otg-ci";
+			reg		= <0xA3600000 0x400>;
+			interrupts	= <60 IRQ_TYPE_NONE>;
+			dr_mode		= "otg";
+
+			clocks		= <&gcc USB_HS_CORE_CLK>,
+					  <&gcc USB_HS_P_CLK>,
+					  <&gcc USB_HS_CLK>;
+			clock-names	= "core", "iface", "alt_core";
+
+			resets		= <&gcc USB_HS_RESET>,
+					  <&gcc USB_PHY_RESET>;
+			reset-names	= "link", "phy";
+
+			vddcx-supply	= <&vusb_fixed>;
+			v3p3-supply	= <&ldo6>;
+			v1p8-supply	= <&ldo7>;
+		};
+
+		usb2_phy: phy@A3610000 {
+			status		= "disabled";
+			compatible	= "qcom,usb-otg-ci";
+			reg		= <0xA3610000 0x400>;
+			interrupts	= <61 IRQ_TYPE_NONE>;
+			dr_mode		= "host";
+
+			clocks		= <&gcc USB_HS2_CORE_CLK>,
+					  <&gcc USB_HS2_P_CLK>,
+					  <&gcc USB_HS2_CLK>;
+			clock-names	= "core", "iface", "alt_core";
+
+			resets		= <&gcc USB_HS2_RESET>,
+					  <&gcc USB_PHY_RESET>;
+			reset-names	= "link", "phy";
+
+			vddcx-supply	= <&vusb_fixed>;
+			v3p3-supply	= <&ldo6>;
+			v1p8-supply	= <&ldo7>;
+		};
+
+		usb3_phy: phy@A3620000 {
+			status		= "disabled";
+			compatible	= "qcom,usb-otg-ci";
+			reg		= <0xA3620000 0x400>;
+			interrupts	= <62 IRQ_TYPE_NONE>;
+			dr_mode		= "host";
+
+			clocks		= <&gcc USB_HS3_CORE_CLK>,
+					  <&gcc USB_HS3_P_CLK>,
+					  <&gcc USB_HS3_CLK>;
+			clock-names	= "core", "iface", "alt_core";
+
+			resets		= <&gcc USB_HS3_RESET>,
+					  <&gcc USB_PHY_RESET>;
+			reset-names	= "link", "phy";
+
+			vddcx-supply	= <&vusb_fixed>;
+			v3p3-supply	= <&ldo6>;
+			v1p8-supply	= <&ldo7>;
+		};
+
+		gadget1: gadget@A3600000 {
+			compatible	= "qcom,ci-hdrc";
+			reg		= <0xA3600000 0x400>;
+			dr_mode		= "peripheral";
+			interrupts	= <60 IRQ_TYPE_NONE>;
+			usb-phy		= <&usb1_phy>;
+		};
+
+		usb1: usb@A3600000 {
+			status = "disabled";
+			compatible	= "qcom,ehci-host";
+			reg		= <0xA3600000 0x400>;
+			interrupts	= <60 IRQ_TYPE_NONE>;
+			usb-phy		= <&usb1_phy>;
+		};
+
+		usb2: usb@A3610000 {
+			status		= "disabled";
+			compatible	= "qcom,ehci-host";
+			reg		= <0xA3610000 0x400>;
+			interrupts	= <61 IRQ_TYPE_NONE>;
+			usb-phy		= <&usb2_phy>;
+		};
+
+		usb3: usb@A3620000 {
+			status		= "disabled";
+			compatible	= "qcom,ehci-host";
+			reg		= <0xA3620000 0x400>;
+			interrupts	= <62 IRQ_TYPE_NONE>;
+			usb-phy		= <&usb3_phy>;
+		};
+
+		qcom,ssbi@AD900000 {
+			compatible = "qcom,ssbi";
+			reg = <0xAD900000 0x1000>;
+			qcom,controller-type = "ssbi2";
+
+			pinctrl-names = "default";
+			pinctrl-0 = <&pmic_irq_bus>;
+
+			pmicintc: pmic@0 {
+				compatible = "qcom,pm8058";
+				interrupt-parent = <&tlmm>;
+				interrupts = <27 IRQ_TYPE_LEVEL_LOW>;
+				#interrupt-cells = <2>;
+				interrupt-controller;
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				pm8058_gpio: gpio@150 {
+					compatible = "qcom,pm8058-gpio",
+						     "qcom,ssbi-gpio";
+					reg = <0x150>;
+					interrupt-parent = <&pmicintc>;
+					interrupts = <192 1>, <193 1>, <194 1>,
+						     <195 1>, <196 1>, <197 1>,
+						     <198 1>, <199 1>, <200 1>,
+						     <201 1>, <202 1>, <203 1>,
+						     <204 1>, <205 1>, <206 1>,
+						     <207 1>, <208 1>, <209 1>,
+						     <210 1>, <211 1>, <212 1>,
+						     <213 1>, <214 1>, <215 1>,
+						     <216 1>, <217 1>, <218 1>,
+						     <219 1>, <220 1>, <221 1>,
+						     <222 1>, <223 1>, <224 1>,
+						     <225 1>, <226 1>, <227 1>,
+						     <228 1>, <229 1>, <230 1>,
+						     <231 1>;
+					gpio-controller;
+					#gpio-cells = <2>;
+				};
+
+				pm8058_mpps: mpps@50 {
+					compatible = "qcom,pm8058-mpp",
+						     "qcom,ssbi-mpp";
+					reg = <0x50>;
+					gpio-controller;
+					#gpio-cells = <2>;
+					interrupt-parent = <&pmicintc>;
+					interrupts =
+					<128 1>, <129 1>, <130 1>, <131 1>,
+					<132 1>, <133 1>, <134 1>, <135 1>,
+					<136 1>, <137 1>, <138 1>, <139 1>;
+				};
+
+				keypad@148 {
+					compatible = "qcom,pm8058-keypad";
+					reg = <0x148>;
+					interrupt-parent = <&pmicintc>;
+					interrupts = <74 IRQ_TYPE_EDGE_RISING>,
+						     <75 IRQ_TYPE_EDGE_RISING>;
+					debounce = <15>;
+					scan-delay = <32>;
+					row-hold = <91500>;
+				};
+
+				vibrator@4a {
+					compatible = "qcom,pm8058-vib";
+					reg = <0x4a>;
+				};
+			};
+		};
+
+		/* Temporary fixed regulator */
+		vsdcc_fixed: vsdcc-regulator {
+			compatible = "regulator-fixed";
+			regulator-name = "SDCC Power";
+			regulator-min-microvolt = <2700000>;
+			regulator-max-microvolt = <2700000>;
+			regulator-always-on;
+		};
+
+		amba {
+			compatible = "arm,amba-bus";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges;
+			sdcc2: sdcc@A0500000 {
+				status		= "disabled";
+				compatible	= "arm,pl18x", "arm,primecell";
+				arm,primecell-periphid = <0x00051180>;
+				reg		= <0xA0500000 0x1000>;
+				interrupts	= <98 IRQ_TYPE_LEVEL_HIGH>,
+						  <99 IRQ_TYPE_LEVEL_HIGH>;
+				interrupt-names	= "cmd_irq", "pio_irq";
+				clocks		= <&gcc SDC2_CLK>,
+						  <&gcc SDC2_P_CLK>;
+				clock-names	= "mclk", "apb_pclk";
+				bus-width	= <8>;
+				max-frequency	= <49152000>;
+				non-removable;
+				cap-sd-highspeed;
+				cap-mmc-highspeed;
+				vmmc-supply = <&vsdcc_fixed>;
+
+				pinctrl-names	= "default";
+				pinctrl-0	= <&sdc2_gpios>;
+
+				dmas = <&adm_dma 7>;
+				dma-names = "rx";
+				qcom,crci = <7>;
+			};
+
+			sdcc4: sdcc@A3100000 {
+				status		= "disabled";
+				compatible	= "arm,pl18x", "arm,primecell";
+				arm,primecell-periphid = <0x00051180>;
+				reg		= <0xA3100000 0x1000>;
+				interrupts	= <100 IRQ_TYPE_LEVEL_HIGH>,
+						  <101 IRQ_TYPE_LEVEL_HIGH>;
+				interrupt-names	= "cmd_irq", "pio_irq";
+				clocks		= <&gcc SDC4_CLK>,
+						  <&gcc SDC4_P_CLK>;
+				clock-names	= "mclk", "apb_pclk";
+				bus-width	= <4>;
+				max-frequency	= <49152000>;
+				cap-sd-highspeed;
+				cap-mmc-highspeed;
+				vmmc-supply = <&vsdcc_fixed>;
+				no-1-8-v;
+				cd-gpios = <&pm8058_gpio 36 0>;
+
+				pinctrl-names	= "default";
+				pinctrl-0	= <&sdc4_gpios>,
+						  <&pm8058_sdc4_gpios>;
+
+				dmas = <&adm_dma 8>;
+				dma-names = "rx";
+				qcom,crci = <13>;
+			};
+		};
+	};
+};
+
+&tlmm {
+	pmic_irq_bus:pmic_irq_bus {
+		pm_irq_apc {
+			pins = "gpio27";
+			function = "peripheral";
+			bias-pull-none;
+			input-enable;
+		};
+	};
+
+	msm_i2c_gpios:msm_i2c_gpios {
+		i2c_sclsda {
+			pins = "gpio70", "gpio71";
+			function = "peripheral";
+			bias-pull-none;
+			drive-strength = <16>;
+			input-enable;
+		};
+	};
+
+	msm_i2c_io_gpios:msm_i2c_io_gpios {
+		i2c_sclsda {
+			pins = "gpio70", "gpio71";
+			function = "gpio";
+			bias-pull-none;
+			drive-strength = <16>;
+		};
+	};
+
+	sdc2_gpios:sdc2_gpios {
+		sdc2_clk {
+			pins = "gpio64";
+			function = "peripheral";
+			bias-pull-none;
+			drive-strength = <16>;
+		};
+		sdc2_clkdat {
+			pins = "gpio65", "gpio66", "gpio67", "gpio68", "gpio69",
+			       "gpio112", "gpio113", "gpio114", "gpio115";
+			function = "peripheral";
+			bias-pull-up;
+			drive-strength = <8>;
+		};
+	};
+
+	sdc4_gpios:sdc4_gpios {
+		sdc4_clk {
+			pins = "gpio58";
+			function = "peripheral";
+			bias-pull-none;
+			drive-strength = <16>;
+		};
+		sdc4_clkdat {
+			pins = "gpio59", "gpio60", "gpio61", "gpio62", "gpio63";
+			function = "peripheral";
+			bias-pull-up;
+			drive-strength = <8>;
+		};
+	};
+};
+
+&pm8058_gpio {
+	pm8058_sdc4_gpios:pm8058_sdc4_gpios {
+		sd_det {
+			pins = "gpio36";
+			function = "normal";
+			input-enable;
+			bias-pull-up;
+			qcom,pull-up-strength = <PMIC_GPIO_PULL_UP_1P5>;
+			power-source = <PM8058_GPIO_S3>;
+			qcom,drive-strength = <PMIC_GPIO_STRENGTH_NO>;
+			drive-push-pull;
+		};
+	};
+};

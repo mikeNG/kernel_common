@@ -1,0 +1,5 @@
+#include "qcom-msm7x30-huawei.dtsi"
+
+/ {
+	model = "Huawei IDEOS X5";
+};
