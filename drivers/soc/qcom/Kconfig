@@ -84,3 +84,9 @@ config MSM_RMT_STORAGE_CLIENT_STATS
 	help
 	  Collects performance statistics and shows this information
 	  through a debugfs file rmt_storage_stats.
+
+config MSM_DALRPC
+	bool "DAL RPC support"
+	depends on MSM_SMD
+	help
+	  Supports RPC calls to DAL devices on remote processor cores.

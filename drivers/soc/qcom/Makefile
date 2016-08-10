@@ -12,3 +12,4 @@ obj-$(CONFIG_MSM_ONCRPCROUTER)	+= smd_rpcrouter_servers.o
 obj-$(CONFIG_MSM_ONCRPCROUTER)	+= smd_rpcrouter_xdr.o
 obj-$(CONFIG_MSM_ONCRPCROUTER)	+= rpc_router_smd_xprt.o
 obj-$(CONFIG_MSM_RMT_STORAGE_CLIENT) += rmt_storage_client.o
+obj-$(CONFIG_MSM_DALRPC)	+= dal.o
