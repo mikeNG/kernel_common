@@ -84,6 +84,12 @@ int smsm_state_cb_register(uint32_t smsm_entry, uint32_t mask,
 int smsm_state_cb_deregister(uint32_t smsm_entry, uint32_t mask,
 	void (*notify)(void *, uint32_t, uint32_t), void *data);
 
+/**
+ * smsm_check_for_modem_crash - Checks for modem crash state
+ *
+ * returns success when modem is not in reset state
+ */
+int smsm_check_for_modem_crash(void);
 #else
 static inline int smsm_change_state(uint32_t smsm_entry,
 		      uint32_t clear_mask, uint32_t set_mask)

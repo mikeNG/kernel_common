@@ -2979,6 +2979,19 @@ int smsm_state_cb_deregister(uint32_t smsm_entry, uint32_t mask,
 }
 EXPORT_SYMBOL(smsm_state_cb_deregister);
 
+int smsm_check_for_modem_crash(void)
+{
+	/* if the modem's not ready yet, we have to hope for the best */
+	if (!smsm_info.state)
+		return 0;
+
+	if (__raw_readl(SMSM_STATE_ADDR(SMSM_MODEM_STATE)) & SMSM_RESET)
+		return -1;
+
+	return 0;
+}
+EXPORT_SYMBOL(smsm_check_for_modem_crash);
+
 static int restart_notifier_cb(struct notifier_block *this,
 				  unsigned long code,
 				  void *data);
