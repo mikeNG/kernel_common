@@ -70,3 +70,17 @@ config MSM_ONCRPCROUTER_DEBUG
 	help
 	  Support for debugging the ONCRPC router for communication
 	  between the ARM9 and ARM11
+
+config MSM_RMT_STORAGE_CLIENT
+	depends on MSM_ONCRPCROUTER
+	bool "Remote Storage RPC client"
+	help
+	  Provide RPC mechanism for remote processors to access storage
+	  device on apps processor.
+
+config MSM_RMT_STORAGE_CLIENT_STATS
+	depends on (MSM_RMT_STORAGE_CLIENT && DEBUG_FS)
+	bool "Remote storage RPC client performance statistics"
+	help
+	  Collects performance statistics and shows this information
+	  through a debugfs file rmt_storage_stats.
