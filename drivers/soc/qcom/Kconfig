@@ -56,3 +56,17 @@ config QCOM_PROC_COMM
 	help
 	  Enables a lightweight communications interface to the
 	  baseband processor.
+
+config MSM_ONCRPCROUTER
+	depends on MSM_SMD
+	bool "MSM ONCRPC router support"
+	help
+	  Support for the MSM ONCRPC router for communication between
+	  the ARM9 and ARM11
+
+config MSM_ONCRPCROUTER_DEBUG
+	depends on MSM_ONCRPCROUTER
+	bool "MSM debug ONCRPC router support"
+	help
+	  Support for debugging the ONCRPC router for communication
+	  between the ARM9 and ARM11
