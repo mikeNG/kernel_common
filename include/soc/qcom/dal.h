@@ -14,6 +14,8 @@
 #ifndef __DAL_H__
 #define __DAL_H__
 
+#include <soc/qcom/smd.h>
+
 #define DALRPC_DEST_MODEM SMD_APPS_MODEM
 #define DALRPC_DEST_QDSP SMD_APPS_QDSP
 
