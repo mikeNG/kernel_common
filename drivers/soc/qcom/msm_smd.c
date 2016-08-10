@@ -1506,6 +1506,19 @@ static int smd_is_packet(struct smd_alloc_elm *alloc_elm)
 	else if (SMD_XFER_TYPE(alloc_elm->type) == 2)
 		return 1;
 
+	/* for cases where xfer type is 0 */
+	if (!strncmp(alloc_elm->name, "DAL", 3))
+		return 0;
+
+	/* for cases where xfer type is 0 */
+	if (!strncmp(alloc_elm->name, "RPCCALL_QDSP", 12))
+		return 0;
+
+	if (alloc_elm->cid > 4 || alloc_elm->cid == 1)
+		return 1;
+	else
+		return 0;
+
 	panic("Unsupported SMD xfer type: %d name:%s edge:%d\n",
 					SMD_XFER_TYPE(alloc_elm->type),
 					alloc_elm->name,
