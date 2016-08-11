@@ -20,6 +20,7 @@
 #include <linux/msm_remote_spinlock.h>
 #include <linux/slab.h>
 
+#include <soc/qcom/dal.h>
 #include <soc/qcom/smem.h>
 
 /**
@@ -520,6 +521,44 @@ static int remote_spinlock_init_address_smem(int id, _remote_spinlock_t *lock)
 	return 0;
 }
 
+static int remote_spinlock_dal_init(const char *chunk_name,
+				    _remote_spinlock_t *lock)
+{
+	void *dal_smem_start, *dal_smem_end;
+	uint32_t dal_smem_size;
+	struct dal_chunk_header *cur_header;
+
+	if (!chunk_name)
+		return -EINVAL;
+
+	dal_smem_start = smem_get_entry(SMEM_DAL_AREA, &dal_smem_size,
+					SMD_MODEM, 0);
+	if (!dal_smem_start)
+		return -ENXIO;
+
+	dal_smem_end = dal_smem_start + dal_smem_size;
+
+	/* Find first chunk header */
+	cur_header = (struct dal_chunk_header *)
+			(((uint32_t)dal_smem_start + (4095)) & ~4095);
+	*lock = NULL;
+	while (cur_header->size != 0
+		&& ((uint32_t)(cur_header + 1) < (uint32_t)dal_smem_end)) {
+
+		/* Check if chunk name matches */
+		if (!strncmp(cur_header->name, chunk_name,
+			     DAL_CHUNK_NAME_LENGTH)) {
+			*lock = (_remote_spinlock_t)&cur_header->lock;
+			return 0;
+		}
+		cur_header = (void *)cur_header + cur_header->size;
+	}
+
+	pr_err("%s: DAL remote lock \"%s\" not found.\n", __func__,
+		chunk_name);
+	return -EINVAL;
+}
+
 static int remote_spinlock_init_address(int id, _remote_spinlock_t *lock)
 {
 	if (is_hw_lock_type)
@@ -546,7 +585,10 @@ int _remote_spin_lock_init(remote_spinlock_id_t id, _remote_spinlock_t *lock)
 		mutex_unlock(&ops_init_lock);
 	}
 
-	if (id[0] == 'S' && id[1] == ':') {
+	if (id[0] == 'D' && id[1] == ':') {
+		/* DAL chunk name starts after "D:" */
+		return remote_spinlock_dal_init(&id[2], lock);
+	} else if (id[0] == 'S' && id[1] == ':') {
 		/* Single-digit lock ID follows "S:" */
 		BUG_ON(id[3] != '\0');
 
