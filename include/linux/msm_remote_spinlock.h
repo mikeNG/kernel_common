@@ -43,6 +43,16 @@ typedef raw_remote_spinlock_t *_remote_spinlock_t;
 
 #define remote_spinlock_id_t const char *
 
+typedef struct {
+	_remote_spinlock_t	r_spinlock;
+	uint32_t		delay_us;
+} _remote_mutex_t;
+
+struct remote_mutex_id {
+	remote_spinlock_id_t	r_spinlock_id;
+	uint32_t		delay_us;
+};
+
 #if defined(CONFIG_REMOTE_SPINLOCK_MSM)
 int _remote_spin_lock_init(remote_spinlock_id_t, _remote_spinlock_t *lock);
 void _remote_spin_release_all(uint32_t pid);
@@ -54,6 +64,10 @@ int _remote_spin_owner(_remote_spinlock_t *lock);
 void _remote_spin_lock_rlock_id(_remote_spinlock_t *lock, uint32_t tid);
 void _remote_spin_unlock_rlock(_remote_spinlock_t *lock);
 int _remote_spin_get_hw_spinlocks_element(_remote_spinlock_t *lock);
+int _remote_mutex_init(struct remote_mutex_id *id, _remote_mutex_t *lock);
+void _remote_mutex_lock(_remote_mutex_t *lock);
+void _remote_mutex_unlock(_remote_mutex_t *lock);
+int _remote_mutex_trylock(_remote_mutex_t *lock);
 #else
 static inline
 int _remote_spin_lock_init(remote_spinlock_id_t id, _remote_spinlock_t *lock)
@@ -80,6 +94,17 @@ static inline void _remote_spin_lock_rlock_id(_remote_spinlock_t *lock,
 static inline void _remote_spin_unlock_rlock(_remote_spinlock_t *lock) {}
 static inline int _remote_spin_get_hw_spinlocks_element(
 		_remote_spinlock_t *lock)
+{
+	return -ENODEV;
+}
+static inline
+int _remote_mutex_init(struct remote_mutex_id *id, _remote_mutex_t *lock)
+{
+	return -EINVAL;
+}
+static inline void _remote_mutex_lock(_remote_mutex_t *lock) {}
+static inline void _remote_mutex_unlock(_remote_mutex_t *lock) {}
+static inline int _remote_mutex_trylock(_remote_mutex_t *lock)
 {
 	return -ENODEV;
 }
