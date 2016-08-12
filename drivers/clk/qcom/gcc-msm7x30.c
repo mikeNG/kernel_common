@@ -321,8 +321,7 @@ static struct clk_regmap pll4_vote = {
 
 static struct clk_branch glbl_root_clk = {
 	.halt_reg = GLBL_CLK_STATE_REG,
-	.halt_check = BRANCH_HALT_VOTED,
-	.halt_bit = 29,//This is guess
+	.halt_check = BRANCH_HALT_DELAY,
 	.clkr = {
 		.enable_reg = GLBL_CLK_ENA_SC_REG,
 		.enable_mask = BIT(29),
