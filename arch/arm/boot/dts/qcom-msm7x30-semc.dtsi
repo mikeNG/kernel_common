@@ -23,3 +23,28 @@
 &ldo20 {
 	regulator-max-microvolt = <3050000>;
 };
+
+&pm8058_gpio {
+	pm8058_keypad_gpios: pm8058_keypad_gpios {
+		kypd_sns {
+			pins = "gpio1", "gpio2", "gpio3", "gpio4", "gpio5";
+			function = "normal";
+			input-enable;
+			bias-pull-up;
+			qcom,pull-up-strength = <PMIC_GPIO_PULL_UP_31P5>;
+			power-source = <PM8058_GPIO_S3>;
+			qcom,drive-strength = <PMIC_GPIO_STRENGTH_NO>;
+			drive-push-pull;
+		};
+
+		kypd_drv {
+			pins = "gpio9", "gpio10", "gpio11", "gpio12", "gpio13";
+			function = "func1";
+			drive-open-drain;
+			output-low;
+			bias-disable;
+			power-source = <PM8058_GPIO_S3>;
+			qcom,drive-strength = <PMIC_GPIO_STRENGTH_LOW>;
+		};
+	};
+};
