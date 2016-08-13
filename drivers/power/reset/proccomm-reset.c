@@ -12,9 +12,9 @@
  */
 
 #include <asm/idmap.h>
-#include <asm/system_misc.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/reboot.h>
 #include <soc/qcom/proc_comm.h>
 
 static void proccomm_reset_pm_power_off(void)
@@ -22,30 +22,33 @@ static void proccomm_reset_pm_power_off(void)
 	/* Disable interrupts */
 	local_irq_disable();
 	local_fiq_disable();
-	msm_proc_comm(PCOM_POWER_DOWN, 0, 0);
-	for (;;)
+	msm_proc_comm(PCOM_POWER_DOWN, NULL, NULL);
+	while (1)
 		;
 }
 
 static int proccomm_reset_restart(struct notifier_block *this,
 				  unsigned long mode, void *cmd)
 {
-	uint32_t restart_reason = 0x776655AA;
+	uint32_t restart_reason = 0x77665501;
 
-	if (!strncmp(cmd, "bootloader", 10))
-		restart_reason = 0x77665500;
-	else if (!strncmp(cmd, "recovery", 8))
-		restart_reason = 0x77665502;
-	else if (!strncmp(cmd, "eraseflash", 10))
-		restart_reason = 0x776655EF;
-	else if (!strncmp(cmd, "oem-", 4)) {
-		unsigned long code;
-		int res;
-		res = kstrtoul(cmd + 4, 16, &code);
-		code &= 0xff;
-		restart_reason = 0x6f656d00 | code;
-	} else
-		restart_reason = 0x77665501;
+	if (cmd) {
+		if (!strncmp(cmd, "bootloader", 10)) {
+			restart_reason = 0x77665500;
+		} else if (!strncmp(cmd, "recovery", 8)) {
+			restart_reason = 0x77665502;
+		} else if (!strncmp(cmd, "eraseflash", 10)) {
+			restart_reason = 0x776655EF;
+		} else if (!strncmp(cmd, "oem-", 4)) {
+			unsigned long code;
+			int res;
+			res = kstrtoul(cmd + 4, 16, &code);
+			code &= 0xff;
+			restart_reason = 0x6f656d00 | code;
+		}
+	}
+
+	pr_debug("The reset reason is %x\n", restart_reason);
 
 	/* Disable interrupts */
 	local_irq_disable();
@@ -60,9 +63,8 @@ static int proccomm_reset_restart(struct notifier_block *this,
 	 */
 	setup_mm_for_reboot();
 
-	pr_debug("The reset reason is %x\n", restart_reason);
-	msm_proc_comm(PCOM_RESET_CHIP, &restart_reason, 0);
-	for (;;)
+	msm_proc_comm(PCOM_RESET_CHIP, &restart_reason, NULL);
+	while (1)
 		;
 
 	return NOTIFY_DONE;
