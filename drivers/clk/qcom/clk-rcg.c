@@ -357,6 +357,11 @@ clk_rcg_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
 	pre_div = ns_to_pre_div(&rcg->p, ns);
 
 	if (rcg->mn.width) {
+		/* If MN ctrl is not enabled, the root is not enabled, hence
+		 * the calculation is invalid. */
+		if (~ns & BIT(mn->mnctr_en_bit))
+			return 0;
+
 		regmap_read(rcg->clkr.regmap, rcg->md_reg, &md);
 		m = md_to_m(mn, md);
 		n = ns_m_to_n(mn, ns, m);
