@@ -412,8 +412,10 @@ static struct clk_branch usb_hs_clk = {
 		.enable_mask = BIT(9),
 		.hw.init = &(struct clk_init_data){
 			.name = "usb_hs_clk",
+			.parent_names = (const char *[]){ "usb_hs_src" },
+			.num_parents = 1,
 			.ops = &clk_branch_ops,
-			.flags = CLK_IS_ROOT,
+			.flags = CLK_SET_RATE_PARENT,
 		},
 	},
 };
@@ -458,8 +460,10 @@ static struct clk_branch usb_hs2_clk = {
 		.enable_mask = BIT(9),
 		.hw.init = &(struct clk_init_data){
 			.name = "usb_hs2_clk",
+			.parent_names = (const char *[]){ "usb_hs_src" },
+			.num_parents = 1,
 			.ops = &clk_branch_ops,
-			.flags = CLK_IS_ROOT,
+			.flags = CLK_SET_RATE_PARENT,
 		},
 	},
 };
@@ -504,8 +508,10 @@ static struct clk_branch usb_hs3_clk = {
 		.enable_mask = BIT(9),
 		.hw.init = &(struct clk_init_data){
 			.name = "usb_hs3_clk",
+			.parent_names = (const char *[]){ "usb_hs_src" },
+			.num_parents = 1,
 			.ops = &clk_branch_ops,
-			.flags = CLK_IS_ROOT,
+			.flags = CLK_SET_RATE_PARENT,
 		},
 	},
 };
