@@ -119,15 +119,12 @@ int msm_proc_comm(unsigned cmd, unsigned *data1, unsigned *data2)
 	if (!data)
 		return -EPROBE_DEFER;
 
+	if (data->pcom_disabled)
+		return -EIO;
+
 	base = data->shared_ram;
 
 	spin_lock_irqsave(&data->lock, flags);
-
-	if (data->pcom_disabled) {
-		ret = -EIO;
-		goto end;
-	}
-
 
 again:
 	if (proc_comm_wait_for(base + MDM_STATUS, PCOM_READY))
@@ -164,7 +161,7 @@ again:
 		pr_err("%s: proc comm disabled\n", __func__);
 		break;
 	}
-end:
+
 	/* Make sure the writes complete before returning */
 	wmb();
 	spin_unlock_irqrestore(&data->lock, flags);
