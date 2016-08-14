@@ -52,6 +52,7 @@
 			clock-frequency = <24576000>,
 					  <32768>;
 			cpu-offset = <0x0>;
+			broken-divide;
 		};
 
 		apcs: syscon@C0182000 {
