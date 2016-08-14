@@ -23,3 +23,9 @@
 		pinctrl-0 = <&pm8058_keypad_gpios>;
 	};
 };
+
+&sdc4_gpios {
+	sdc4_clkdat {
+		drive-strength = <4>;
+	};
+};
