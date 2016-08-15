@@ -333,7 +333,7 @@
 				max-frequency	= <49152000>;
 				cap-sd-highspeed;
 				cap-mmc-highspeed;
-				vmmc-supply = <&vsdcc_fixed>;
+				vmmc-supply = <&ldo5>;
 				no-1-8-v;
 				cd-gpios = <&pm8058_gpio 36 0>;
 
@@ -412,6 +412,13 @@
 
 &pm8058_gpio {
 	pm8058_sdc4_gpios:pm8058_sdc4_gpios {
+		sdc4_pwr_en {
+			pins = "gpio25";
+			function = "normal";
+			bias-disable;
+			power-source = <PM8058_GPIO_L5>;
+			qcom,drive-strength = <PMIC_GPIO_STRENGTH_LOW>;
+		};
 		sd_det {
 			pins = "gpio36";
 			function = "normal";

@@ -49,6 +49,9 @@
 	};
 
 	pm8058_sdc4_gpios: pm8058_sdc4_gpios {
+		sdc4_pwr_en {
+			qcom,drive-strength = <PMIC_GPIO_STRENGTH_HIGH>;
+		};
 		sd_det {
 			pins = "gpio22";
 			bias-pull-none;

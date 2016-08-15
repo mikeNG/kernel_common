@@ -44,6 +44,9 @@
 	};
 
 	pm8058_sdc4_gpios:pm8058_sdc4_gpios {
+		sdc4_pwr_en {
+			pins = "gpio36";
+		};
 		sd_det {
 			pins = "gpio21";
 		};
