@@ -1,5 +1,9 @@
 #include "qcom-msm7x30.dtsi"
 
+&ldo5 {
+	regulator-always-on;
+};
+
 &ldo6 {
 	regulator-max-microvolt = <3500000>;
 };
