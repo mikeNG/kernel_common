@@ -812,4 +812,11 @@ config INPUT_DRV2667_HAPTICS
 	  To compile this driver as a module, choose M here: the
 	  module will be called drv2667-haptics.
 
+config INPUT_RPCSERVER_HANDSET
+	depends on MSM_ONCRPCROUTER
+	bool "Handset events RPC server"
+	help
+	  Support for receiving handset events like headset detect,
+	  headset switch and clamshell state.
+
 endif
