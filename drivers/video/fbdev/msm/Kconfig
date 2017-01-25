@@ -1,0 +1,40 @@
+
+config FB_MSM
+	tristate "MSM Framebuffer support"
+	depends on FB && ARCH_QCOM
+	select FB_CFB_FILLRECT
+	select FB_CFB_COPYAREA
+	select FB_CFB_IMAGEBLIT
+
+config FB_MSM_MDP
+	bool "Mobile Display Processor"
+	depends on FB_MSM
+	help
+	  Say Y here if you want support for the Qualcomm MDP.
+
+config FB_MSM_MDDI
+	bool "MDP Mobile Display Digital Interface"
+	depends on FB_MSM_MDP
+	help
+	  Say Y here to include support for the MDDI subblock found in
+	  Qualcomm MDP.
+
+config FB_MSM_TRIPLE_BUFFER
+	bool "Support for triple frame buffer"
+	depends on FB_MSM_MDP
+
+choice
+	prompt "Default framebuffer color depth"
+	depends on FB_MSM_MDP
+	default FB_MSM_DEFAULT_DEPTH_RGBA8888
+
+config FB_MSM_DEFAULT_DEPTH_RGB565
+	bool "16 bits per pixel (RGB565)"
+
+config FB_MSM_DEFAULT_DEPTH_ARGB8888
+	bool "32 bits per pixel (ARGB8888)"
+
+config FB_MSM_DEFAULT_DEPTH_RGBA8888
+	bool "32 bits per pixel (RGBA8888)"
+
+endchoice
