@@ -22,83 +22,271 @@
 #include <linux/platform_device.h>
 #include <linux/of.h>
 
-/* TODO Unify the oops header, mmtoops, ramoops, mmcoops */
-#define MMCOOPS_KERNMSG_HDR	"===="
-#define MMCOOPS_HEADER_SIZE	(5 + sizeof(struct timeval))
+#define RESULT_OK		0
+#define RESULT_FAIL		1
+#define RESULT_UNSUP_HOST	2
+#define RESULT_UNSUP_CARD	3
 
-#define RECORD_SIZE		4096
+#define BUFFER_SIZE		512000
 
 static int dump_oops = 1;
 module_param(dump_oops, int, 0600);
 MODULE_PARM_DESC(dump_oops,
 		"set to 1 to dump oopses, 0 to only dump panics (default 1)");
 
+static int trigger_dump(const char *str, struct kernel_param *kp)
+{
+	kmsg_dump(KMSG_DUMP_OOPS);
+	return 0;
+}
+module_param_call(trigger_dump, trigger_dump, NULL, NULL, 0600);
+
 #define dev_to_mmc_card(d)	container_of(d, struct mmc_card, dev)
 
 static struct mmcoops_context {
 	struct kmsg_dumper	dump;
 	struct mmc_card		*card;
-	unsigned long		start;
-	unsigned long		size;
+
+	unsigned int		start_offset_blk;
+	unsigned int		size_bytes;
+
 	struct device		*dev;
 	struct platform_device	*pdev;
-	int			count;
-	int			max_count;
-	void			*virt_addr;
+
+	u8			*buffer;
 } oops_cxt;
 
-static void mmc_panic_write(struct mmcoops_context *cxt,
-	char *buf, unsigned long start, unsigned int size)
-{
-	struct mmc_card *card = cxt->card;
-	struct mmc_host *host = card->host;
-	struct mmc_request mrq;
-	struct mmc_command cmd;
-	struct mmc_command stop;
-	struct mmc_data data;
-	struct scatterlist sg;
+/*******************************************************************/
+/*  General helper functions                                       */
+/*******************************************************************/
 
-	memset(&mrq, 0, sizeof(struct mmc_request));
-	memset(&cmd, 0, sizeof(struct mmc_command));
-	memset(&stop, 0, sizeof(struct mmc_command));
-	memset(&data, 0, sizeof(struct mmc_data));
+/*
+ * Configure correct block size in card
+ */
+static int mmc_test_set_blksize(struct mmcoops_context *test, unsigned size)
+{
+	return mmc_set_blocklen(test->card, size);
+}
+
+/*
+ * Fill in the mmc_request structure given a set of transfer parameters.
+ */
+static void mmc_test_prepare_mrq(struct mmcoops_context *test,
+	struct mmc_request *mrq, struct scatterlist *sg, unsigned sg_len,
+	unsigned dev_addr, unsigned blocks, unsigned blksz, int write)
+{
+	BUG_ON(!mrq || !mrq->cmd || !mrq->data || !mrq->stop);
+
+	if (blocks > 1) {
+		mrq->cmd->opcode = write ?
+			MMC_WRITE_MULTIPLE_BLOCK : MMC_READ_MULTIPLE_BLOCK;
+	} else {
+		mrq->cmd->opcode = write ?
+			MMC_WRITE_BLOCK : MMC_READ_SINGLE_BLOCK;
+	}
+
+	mrq->cmd->arg = dev_addr;
+	if (!mmc_card_blockaddr(test->card))
+		mrq->cmd->arg <<= 9;
+
+	mrq->cmd->flags = MMC_RSP_R1 | MMC_CMD_ADTC;
+
+	if (blocks == 1)
+		mrq->stop = NULL;
+	else {
+		mrq->stop->opcode = MMC_STOP_TRANSMISSION;
+		mrq->stop->arg = 0;
+		mrq->stop->flags = MMC_RSP_R1B | MMC_CMD_AC;
+	}
+
+	mrq->data->blksz = blksz;
+	mrq->data->blocks = blocks;
+	mrq->data->flags = write ? MMC_DATA_WRITE : MMC_DATA_READ;
+	mrq->data->sg = sg;
+	mrq->data->sg_len = sg_len;
+
+	mmc_set_data_timeout(mrq->data, test->card);
+}
+
+static int mmc_test_busy(struct mmc_command *cmd)
+{
+	return !(cmd->resp[0] & R1_READY_FOR_DATA) ||
+		(R1_CURRENT_STATE(cmd->resp[0]) == R1_STATE_PRG);
+}
+
+/*
+ * Wait for the card to finish the busy state
+ */
+static int mmc_test_wait_busy(struct mmcoops_context *test)
+{
+	int ret, busy;
+	struct mmc_command cmd = {0};
+
+	busy = 0;
+	do {
+		memset(&cmd, 0, sizeof(struct mmc_command));
+
+		cmd.opcode = MMC_SEND_STATUS;
+		cmd.arg = test->card->rca << 16;
+		cmd.flags = MMC_RSP_R1 | MMC_CMD_AC;
+
+		ret = mmc_wait_for_cmd(test->card->host, &cmd, 0);
+		if (ret)
+			break;
+
+		if (!busy && mmc_test_busy(&cmd)) {
+			busy = 1;
+			if (test->card->host->caps & MMC_CAP_WAIT_WHILE_BUSY)
+				pr_info("%s: Warning: Host did not "
+					"wait for busy state to end.\n",
+					mmc_hostname(test->card->host));
+		}
+	} while (mmc_test_busy(&cmd));
+
+	return ret;
+}
+
+/*
+ * Checks that a normal transfer didn't have any errors
+ */
+static int mmc_test_check_result(struct mmcoops_context *test,
+				 struct mmc_request *mrq)
+{
+	int ret;
+
+	BUG_ON(!mrq || !mrq->cmd || !mrq->data);
+
+	ret = 0;
+
+	if (!ret && mrq->cmd->error)
+		ret = mrq->cmd->error;
+	if (!ret && mrq->data->error)
+		ret = mrq->data->error;
+	if (!ret && mrq->stop && mrq->stop->error)
+		ret = mrq->stop->error;
+	if (!ret && mrq->data->bytes_xfered !=
+		mrq->data->blocks * mrq->data->blksz)
+		ret = RESULT_FAIL;
+
+	if (ret == -EINVAL)
+		ret = RESULT_UNSUP_HOST;
+
+	return ret;
+}
+
+/*
+ * Transfer a single sector of kernel addressable data
+ */
+static int mmc_test_buffer_transfer(struct mmcoops_context *test,
+	u8 *buffer, unsigned addr, unsigned blksz, int write)
+{
+	struct mmc_request mrq = {0};
+	struct mmc_command cmd = {0};
+	struct mmc_command stop = {0};
+	struct mmc_data data = {0};
+
+	struct scatterlist sg;
 
 	mrq.cmd = &cmd;
 	mrq.data = &data;
 	mrq.stop = &stop;
 
-	sg_init_one(&sg, buf, (size << 9));
+	sg_init_one(&sg, buffer, blksz);
 
-	if (size > 1)
-		cmd.opcode = MMC_WRITE_MULTIPLE_BLOCK;
-	else
-		cmd.opcode = MMC_WRITE_BLOCK;
-	cmd.arg = start;
-	cmd.flags = MMC_RSP_R1 | MMC_CMD_ADTC;
+	mmc_test_prepare_mrq(test, &mrq, &sg, 1, addr, 1, blksz, write);
 
-	if (size == 1)
-		mrq.stop = NULL;
-	else {
-		stop.opcode = MMC_STOP_TRANSMISSION;
-		stop.arg = 0;
-		stop.flags = MMC_RSP_R1B | MMC_CMD_AC;
-	}
-
-	data.blksz = 512;
-	data.blocks = size;
-	data.flags = MMC_DATA_WRITE;
-	data.sg = &sg;
-	data.sg_len = 1;
-
-	mmc_wait_for_oops_req(host, &mrq);
+	mmc_wait_for_req(test->card->host, &mrq);
 
 	if (cmd.error)
-		pr_info("%s: cmd error %d\n", __func__, cmd.error);
+		return cmd.error;
 	if (data.error)
-		pr_info("%s: data error %d\n", __func__, data.error);
-	/* wait busy */
+		return data.error;
 
-	cxt->count = (cxt->count + 1) % cxt->max_count;
+	return mmc_test_wait_busy(test);
+}
+
+/*
+ * Tests a basic transfer with certain parameters
+ */
+static int mmc_test_simple_transfer(struct mmcoops_context *test,
+	struct scatterlist *sg, unsigned sg_len, unsigned dev_addr,
+	unsigned blocks, unsigned blksz, int write)
+{
+	struct mmc_request mrq = {0};
+	struct mmc_command cmd = {0};
+	struct mmc_command stop = {0};
+	struct mmc_data data = {0};
+
+	mrq.cmd = &cmd;
+	mrq.data = &data;
+	mrq.stop = &stop;
+
+	mmc_test_prepare_mrq(test, &mrq, sg, sg_len, dev_addr,
+		blocks, blksz, write);
+
+	mmc_wait_for_req(test->card->host, &mrq);
+
+	mmc_test_wait_busy(test);
+
+	return mmc_test_check_result(test, &mrq);
+}
+
+/*
+ * Does a complete transfer test where data is also validated
+ *
+ * Note: mmc_test_prepare() must have been done before this call
+ */
+static int mmc_test_transfer(struct mmcoops_context *test,
+	struct scatterlist *sg, unsigned sg_len, unsigned dev_addr,
+	unsigned blocks, unsigned blksz, int write)
+{
+	int ret, i;
+
+	ret = mmc_test_set_blksize(test, blksz);
+	if (ret)
+		return ret;
+
+	ret = mmc_test_simple_transfer(test, sg, sg_len, dev_addr,
+		blocks, blksz, write);
+	if (ret)
+		return ret;
+
+	if (write) {
+		int sectors;
+
+		ret = mmc_test_set_blksize(test, 512);
+		if (ret)
+			return ret;
+
+		sectors = (blocks * blksz + 511) / 512;
+		if ((sectors * 512) == (blocks * blksz))
+			sectors++;
+
+		if ((sectors * 512) > BUFFER_SIZE)
+			return -EINVAL;
+
+		memset(test->buffer, 0, sectors * 512);
+
+		for (i = 0;i < sectors;i++) {
+			ret = mmc_test_buffer_transfer(test,
+				test->buffer + i * 512,
+				dev_addr + i, 512, 0);
+			if (ret)
+				return ret;
+		}
+
+		for (i = 0;i < blocks * blksz;i++) {
+			if (test->buffer[i] != (u8)i)
+				return RESULT_FAIL;
+		}
+
+		for (;i < sectors * 512;i++) {
+			if (test->buffer[i] != 0xDF)
+				return RESULT_FAIL;
+		}
+	}
+
+	return 0;
 }
 
 static void mmcoops_do_dump(struct kmsg_dumper *dumper,
@@ -107,26 +295,25 @@ static void mmcoops_do_dump(struct kmsg_dumper *dumper,
 	struct mmcoops_context *cxt = container_of(dumper,
 			struct mmcoops_context, dump);
 	struct mmc_card *card = cxt->card;
-	unsigned int count = 0;
-	char *buf;
+	struct scatterlist sg;
 
 	if (!card)
 		return;
-
-	mmc_claim_host(card->host);
 
 	/* Only dump oopses if dump_oops is set */
 	if (reason == KMSG_DUMP_OOPS && !dump_oops)
 		return;
 
-	buf = (char *)(cxt->virt_addr + (cxt->count * RECORD_SIZE));
-	memset(buf, '\0', RECORD_SIZE);
-	count = sprintf(buf + count, "%s", MMCOOPS_KERNMSG_HDR);
+	kmsg_dump_get_buffer(dumper, true, cxt->buffer, cxt->size_bytes, NULL);
 
-	kmsg_dump_get_buffer(dumper, true, buf + MMCOOPS_HEADER_SIZE,
-			RECORD_SIZE - MMCOOPS_HEADER_SIZE, NULL);
+	sg_init_one(&sg, cxt->buffer, cxt->size_bytes);
 
-	mmc_panic_write(cxt, buf, cxt->start + (cxt->count * 8), cxt->size);
+	mmc_claim_host(card->host);
+
+	mmc_test_transfer(cxt, &sg, 1 , cxt->start_offset_blk,
+			  cxt->size_bytes / 512, 512, 1);
+
+	mmc_release_host(card->host);
 }
 
 int  mmc_oops_card_set(struct mmc_card *card)
@@ -143,27 +330,20 @@ int  mmc_oops_card_set(struct mmc_card *card)
 }
 EXPORT_SYMBOL(mmc_oops_card_set);
 
-static int mmc_oops_probe(struct device *dev)
+static int mmc_oops_probe(struct mmc_card *card)
 {
 	int ret = 0;
-	struct mmc_card *card = mmc_dev_to_card(dev);
 
 	ret = mmc_oops_card_set(card);
 	if (ret)
 		return ret;
 
-	mmc_claim_host(card->host);
-
 	return 0;
 }
 
-static int mmc_oops_remove(struct device *dev)
+static void mmc_oops_remove(struct mmc_card *card)
 {
-	struct mmc_card *card = mmc_dev_to_card(dev);
-
 	mmc_release_host(card->host);
-
-	return 0;
 }
 
 /*
@@ -185,8 +365,10 @@ static int mmc_oops_remove(struct device *dev)
  *  # echo mmc0:0001 > /sys/bus/mmc/drivers/mmc_oops/bind
  *  [   48.490814] mmc0: mmc_oops_card_set
  */
-static struct device_driver mmc_driver = {
-	.name		= "mmc_oops",
+static struct mmc_driver mmc_driver = {
+	.drv		= {
+		.name		= "mmc_oops",
+	},
 	.probe		= mmc_oops_probe,
 	.remove		= mmc_oops_remove,
 };
@@ -195,24 +377,20 @@ static struct device_driver mmc_driver = {
 static int mmcoops_parse_dt(struct mmcoops_context *cxt)
 {
 	struct device_node *np = cxt->dev->of_node;
-	u32 start_offset = 0;
-	u32 size = 0;
-	int ret = 0;
+	int ret;
 
-	ret = of_property_read_u32(np, "start-offset", &start_offset);
+	ret = of_property_read_u32(np, "start-offset-blk",
+				   &cxt->start_offset_blk);
 	if (ret) {
-		pr_err("%s: Start offset can't set..\n", __func__);
+		dev_err(cxt->dev, "failed to parse 'start-offset-blk'\n");
 		return ret;
 	}
 
-	ret = of_property_read_u32(np, "size", &size);
+	ret = of_property_read_u32(np, "size-bytes", &cxt->size_bytes);
 	if (ret) {
-		pr_err("%s: Size can't set..\n", __func__);
+		dev_err(cxt->dev, "failed to parse 'size-bytes'\n");
 		return ret;
 	}
-
-	cxt->start = start_offset;
-	cxt->size = size;
 
 	return 0;
 }
@@ -227,7 +405,6 @@ static int __init mmcoops_probe(struct platform_device *pdev)
 		return err;
 
 	cxt->card = NULL;
-	cxt->count = 0;
 	cxt->dev = &pdev->dev;
 
 	err = mmcoops_parse_dt(cxt);
@@ -236,11 +413,8 @@ static int __init mmcoops_probe(struct platform_device *pdev)
 		return err;
 	}
 
-
-	cxt->max_count = (cxt->size << 9) / RECORD_SIZE;
-
-	cxt->virt_addr = kmalloc((cxt->size << 9), GFP_KERNEL);
-	if (!cxt->virt_addr)
+	cxt->buffer = kzalloc(cxt->size_bytes, GFP_KERNEL);
+	if (!cxt->buffer)
 		goto kmalloc_failed;
 
 	cxt->dump.dump = mmcoops_do_dump;
@@ -255,7 +429,7 @@ static int __init mmcoops_probe(struct platform_device *pdev)
 	return err;
 
 kmsg_dump_register_failed:
-	kfree(cxt->virt_addr);
+	kfree(cxt->buffer);
 kmalloc_failed:
 	mmc_unregister_driver(&mmc_driver);
 
@@ -268,7 +442,7 @@ static int mmcoops_remove(struct platform_device *pdev)
 
 	if (kmsg_dump_unregister(&cxt->dump) < 0)
 		pr_warn("mmcoops: colud not unregister kmsg dumper");
-	kfree(cxt->virt_addr);
+	kfree(cxt->buffer);
 	mmc_unregister_driver(&mmc_driver);
 
 	return 0;

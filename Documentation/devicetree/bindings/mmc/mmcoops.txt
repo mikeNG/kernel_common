@@ -6,7 +6,8 @@ Introduction and concept are similar to other oops logger.
 - Disadvantage: if MMC is occurred an oops/panic, this logger can't work.
 
 After reboot, you can get the last log with below command.
-#dd if=/dev/mmcblk0 of=/tmp/dump.log skip=64 count=16
+Count is size in bytes over block size (512). 512000/512=1000
+#dd if=/dev/mmcblk0 of=/tmp/dump.log skip=1048576 count=1000
 #vi dump.log
 
 Required Properties:
@@ -18,6 +19,6 @@ Required Properties:
 Example:
 	mmcoops {
 		compatible = "mmcoops";
-		start-offest = <64>;	/* 64 * 512B = 32KiB offset */
-		size = <16>;		/* 16 * 512B = 8KiB */
+		start-offset-blk = <1048576>; /* The starting block */
+		size-bytes = <512000>; /* Size in bytes */
 	};
