@@ -90,3 +90,10 @@ config MSM_DALRPC
 	depends on MSM_SMD
 	help
 	  Supports RPC calls to DAL devices on remote processor cores.
+
+config MSM_SPM_V1
+	bool "Driver support for SPM Version 1"
+	help
+	  Enables the support for Version 1 of the SPM driver. SPM hardware is
+	  used to manage the processor power during sleep. The driver allows
+	  configuring SPM to allow different power modes.
