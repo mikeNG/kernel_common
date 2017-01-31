@@ -3550,7 +3550,7 @@ static int gcc_msm7x30_probe(struct platform_device *pdev)
 		 * local, sh2     - Local clocks that are located in the
 		 *                  shadow area, may be controlled via remote.
 		 * remote         - Remote clocks that are controlled via proc
-		                    comm.
+		 *                  comm.
 		 */
 		if (clk->always_local)
 			local = true;

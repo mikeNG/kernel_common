@@ -11,7 +11,7 @@ clk-qcom-y += clk-regmap-mux.o
 clk-qcom-y += reset.o
 clk-qcom-$(CONFIG_QCOM_GDSC) += gdsc.o
 
-obj-$(CONFIG_MSM_GCC_7X30) += gcc-msm7x30.o clk-pcom.o
+obj-$(CONFIG_MSM_GCC_7X30) += acpuclk-msm7x30.o gcc-msm7x30.o clk-pcom.o
 obj-$(CONFIG_APQ_GCC_8084) += gcc-apq8084.o
 obj-$(CONFIG_APQ_MMCC_8084) += mmcc-apq8084.o
 obj-$(CONFIG_IPQ_GCC_806X) += gcc-ipq806x.o
