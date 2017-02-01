@@ -12,6 +12,9 @@
 #include <linux/platform_device.h>
 
 static const struct of_device_id machines[] = {
+	{ .compatible = "qcom,msm7x30", },
+
+	{ }
 };
 
 static int __init cpufreq_dt_platdev_init(void)
