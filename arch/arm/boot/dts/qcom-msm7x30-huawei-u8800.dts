@@ -1,0 +1,49 @@
+#include "qcom-msm7x30-huawei.dtsi"
+
+/ {
+	model = "Huawei IDEOS X5";
+
+	gen-vkeys {
+		compatible = "qcom,gen-vkeys";
+		label = "synaptics_i2c_rmi4_hw";
+		qcom,disp-maxx = <480>;
+		qcom,disp-maxy = <800>;
+		qcom,panel-maxx = <480>;
+		qcom,panel-maxy = <882>;
+		qcom,key-codes = <158 139 172 217>;
+		qcom,y-offset = <41>;
+	};
+
+	mmcoops {
+		compatible = "mmcoops";
+		start-offset-blk = <1048576>; /* mmcblk0p7 */
+		size-bytes = <512000>; /* 500 KiB */
+	};
+};
+
+&i2c0 {
+	synaptics-rmi4@70 {
+		synaptics,panel-coords = <480 882>;
+		synaptics,display-coords = <480 800>;
+	};
+};
+
+&mdp_mddi {
+	nt35582 {
+		compatible	= "qcom,mddi-panel";
+		clock-frequency	= <192000000>;
+		panel-on	= <0x1100 0 0x0 125>;
+		panel-off	= <0x1000 0 0x0 10>;
+		panel-init	= <0xB101 0x01
+				   0xB102 0x82
+				   0xB107 0x5A
+				   0x4400 0x00
+				   0x4401 0xC8>;
+		panel-bpp	= <16>;
+		panel-refx100	= <5400>;
+		panel-rev	= <1>;
+		panel-vback	= <6>;
+		panel-xres	= <480>;
+		panel-yres	= <800>;
+	};
+};
