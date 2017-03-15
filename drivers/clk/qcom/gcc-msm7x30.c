@@ -822,6 +822,7 @@ static const struct freq_tbl clk_tbl_grp[] = {
 	{ 184320000, P_PLL3,  4 },
 	{ 192000000, P_PLL1,  4 },
 	{ 245760000, P_PLL3,  3 },
+	{ 256000000, P_PLL1,  3 },
 	{ }
 };
 
