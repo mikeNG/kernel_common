@@ -118,7 +118,6 @@ struct synaptics_i2c_rmi4 {
 	bool hasEgrSingleTap;
 	bool hasEgrPalmDetect;
 	bool f11_has_Sensitivity_Adjust;
-	struct f11_finger_data *f11_fingers;
 
 	int hasF19;
 	struct rmi_function_info f19;
@@ -295,9 +294,6 @@ static int synaptics_i2c_rmi4_read_pdt(struct synaptics_i2c_rmi4 *ts)
 			if (ts->f11.points_supported == 6)
 				ts->f11.points_supported = 10;
 
-			ts->f11_fingers = kcalloc(ts->f11.points_supported,
-				sizeof(*ts->f11_fingers), GFP_KERNEL);
-
 			ts->f11_has_gestures = (query[1] >> 5) & 1;
 			ts->f11_has_relative = (query[1] >> 3) & 1;
 			/* if the sensitivity adjust exist */
@@ -440,7 +436,6 @@ static void synaptics_i2c_rmi4_work_func(struct work_struct *work)
 	u4 wx = 0;
 	u4 wy = 0;
 	u8 z = 0 ;
-	__u8 prev_state = 0;
 	int finger_num = 0;
 	__u8 *interrupt = NULL;
 	struct synaptics_i2c_rmi4 *ts =
@@ -479,15 +474,6 @@ static void synaptics_i2c_rmi4_work_func(struct work_struct *work)
 			x = (x * ts->panel_x) / ts->f11_max_x;
 			y = (y * ts->panel_y) / ts->f11_max_y;
 
-			prev_state = ts->f11_fingers[f].status;
-
-			if (prev_state && !finger_status ) {
-				/* this is a release */
-				z = wx = wy = 0;
-			} else if (!prev_state && !finger_status ) {
-				/* nothing to report */
-				continue;
-			}
 			input_mt_slot(ts->input_dev, f);
 			input_mt_report_slot_state(ts->input_dev,
 				MT_TOOL_FINGER, finger_status);
@@ -502,7 +488,6 @@ static void synaptics_i2c_rmi4_work_func(struct work_struct *work)
 					ABS_MT_POSITION_Y, y);
 				finger_num++;
 			}
-			ts->f11_fingers[f].status = finger_status;
 		}
 		/* Report if there is any finger on the TP */
 		input_report_key(ts->input_dev, BTN_TOUCH, finger_num);
