@@ -52,9 +52,7 @@ static int set_rail_state(int pcom_id, int state)
 struct proccomm_footswitch_data {
 	struct regulator_desc	rdesc;
 	unsigned		id;
-	struct clk		*core_clk;
-	int			core_clk_init_rate;
-	struct clk		*iface_clk;
+	struct clk		*apb_clk;
 
 	bool			enabled;
 };
@@ -62,16 +60,10 @@ struct proccomm_footswitch_data {
 static int proccomm_fs_set_clocks(struct proccomm_footswitch_data *data,
 				  bool enable)
 {
-	if (enable) {
-		bool rate_set = !!clk_get_rate(data->core_clk);
-		if (!rate_set)
-			clk_set_rate(data->core_clk, data->core_clk_init_rate);
-		clk_prepare_enable(data->core_clk);
-		clk_prepare_enable(data->iface_clk);
-	} else {
-		clk_disable_unprepare(data->iface_clk);
-		clk_disable_unprepare(data->core_clk);
-	}
+	if (enable)
+		clk_prepare_enable(data->apb_clk);
+	else
+		clk_disable_unprepare(data->apb_clk);
 
 	return 0;
 }
@@ -166,30 +158,18 @@ static int proccomm_fs_probe(struct platform_device *pdev)
 	}
 
 	/*
-	 * Enable footswitch in manual mode (ie. not controlled along
+	 * Set footswitch in manual mode (ie. not controlled along
 	 * with pcom clocks).
 	 */
-	ret = set_rail_state(data->id, PCOM_CLKCTL_RPC_RAIL_ENABLE);
-	if (ret) {
-		dev_err(dev, "failed to set rail state for %d\n", data->id);
-		return ret;
-	}
-
 	ret = set_rail_mode(data->id, PCOM_RAIL_MODE_MANUAL);
 	if (ret) {
 		dev_err(dev, "failed to set rail mode for %d\n", data->id);
 		return ret;
 	}
 
-	data->core_clk = devm_clk_get(dev, "core");
-	if (IS_ERR(data->core_clk))
-		data->core_clk = NULL;
-
-	of_property_read_u32(node, "core-clk-rate", &data->core_clk_init_rate);
-
-	data->iface_clk = devm_clk_get(dev, "iface");
-	if (IS_ERR(data->iface_clk))
-		data->iface_clk = NULL;
+	data->apb_clk = devm_clk_get(dev, "core");
+	if (IS_ERR(data->apb_clk))
+		data->apb_clk = NULL;
 
 	initdata = of_get_regulator_init_data(dev, node, rdesc);
 	if (!initdata) {
