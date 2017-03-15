@@ -269,9 +269,8 @@
 				regulator-name = "fs_gfx2d";
 
 				id = <58>;
-				clocks = <&gcc GRP_2D_CLK>, <&gcc GRP_2D_P_CLK>;
+				clocks = <&gcc AXI_GRP_2D_CLK>, <&gcc GRP_2D_P_CLK>;
 				clock-names = "core", "iface";
-				core-clk-rate = <24576000>;
 			};
 
 			fs_gfx3d:footswitch-gfx3d {
@@ -279,9 +278,8 @@
 				regulator-name = "fs_gfx3d";
 
 				id = <8>;
-				clocks = <&gcc GRP_3D_CLK>, <&gcc GRP_3D_P_CLK>;
+				clocks = <&gcc AXI_LI_GRP_CLK>, <&gcc GRP_3D_P_CLK>;
 				clock-names = "core", "iface";
-				core-clk-rate = <24576000>;
 			};
 
 			fs_mdp:footswitch-mdp {
@@ -289,9 +287,8 @@
 				regulator-name = "fs_mdp";
 
 				id = <14>;
-				clocks = <&gcc MDP_CLK>, <&gcc MDP_P_CLK>;
+				clocks = <&gcc AXI_MDP_CLK>, <&gcc MDP_P_CLK>;
 				clock-names = "core", "iface";
-				core-clk-rate = <24576000>;
 			};
 
 			fs_mfc:footswitch-mfc {
@@ -299,9 +296,8 @@
 				regulator-name = "fs_mfc";
 
 				id = <68>;
-				clocks = <&gcc MFC_CLK>, <&gcc MFC_P_CLK>;
+				clocks = <&gcc AXI_MFC_CLK>, <&gcc MFC_P_CLK>;
 				clock-names = "core", "iface";
-				core-clk-rate = <24576000>;
 			};
 
 			fs_rot:footswitch-rot {
@@ -311,7 +307,6 @@
 				id = <90>;
 				clocks = <&gcc AXI_ROTATOR_CLK>, <&gcc ROTATOR_P_CLK>;
 				clock-names = "core", "iface";
-				core-clk-rate = <0>;
 			};
 
 			fs_vfe:footswitch-vfe {
@@ -319,9 +314,8 @@
 				regulator-name = "fs_vfe";
 
 				id = <41>;
-				clocks = <&gcc VFE_CLK>, <&gcc VFE_P_CLK>;
+				clocks = <&gcc AXI_LI_VFE_CLK>, <&gcc VFE_P_CLK>;
 				clock-names = "core", "iface";
-				core-clk-rate = <24576000>;
 			};
 
 			fs_vpe:footswitch-vpe {
@@ -329,9 +323,8 @@
 				regulator-name = "fs_vpe";
 
 				id = <76>;
-				clocks = <&gcc VPE_CLK>;
+				clocks = <&gcc AXI_VPE_CLK>;
 				clock-names = "core";
-				core-clk-rate = <24576000>;
 			};
 		};
 	};
