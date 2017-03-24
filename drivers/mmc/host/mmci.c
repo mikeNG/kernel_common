@@ -1509,6 +1509,8 @@ static int mmci_of_parse(struct device_node *np, struct mmc_host *mmc)
 		mmc->caps |= MMC_CAP_MMC_HIGHSPEED;
 	if (of_get_property(np, "mmc-cap-sd-highspeed", NULL))
 		mmc->caps |= MMC_CAP_SD_HIGHSPEED;
+	if (of_get_property(np, "mmc-cap-mmc-erase", NULL))
+		mmc->caps |= MMC_CAP_ERASE;
 
 	of_property_read_u32(np, "qcom,crci", &host->crci);
 
