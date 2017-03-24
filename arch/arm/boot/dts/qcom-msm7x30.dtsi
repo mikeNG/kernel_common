@@ -507,7 +507,12 @@
 				clock-names	= "mclk", "apb_pclk";
 				bus-width	= <4>;
 				max-frequency	= <49152000>;
+				cap-sd-highspeed;
+				cap-mmc-highspeed;
+				cap-mmc-hw-reset;
 				cap-sdio-irq	= <&tlmm 118 IRQ_TYPE_LEVEL_LOW>;
+				enable-sdio-wakeup;
+				mmc-cap-mmc-erase;
 				wakeup-source;
 				vmmc-supply = <&smps3>;
 
