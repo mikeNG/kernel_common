@@ -482,6 +482,8 @@
 				non-removable;
 				cap-sd-highspeed;
 				cap-mmc-highspeed;
+				cap-mmc-hw-reset;
+				mmc-cap-mmc-erase;
 				vmmc-supply = <&smps3>;
 
 				pinctrl-names	= "default";
@@ -533,6 +535,8 @@
 				max-frequency	= <49152000>;
 				cap-sd-highspeed;
 				cap-mmc-highspeed;
+				cap-mmc-hw-reset;
+				mmc-cap-mmc-erase;
 				vmmc-supply = <&ldo5>;
 				no-1-8-v;
 				cd-gpios = <&pm8058_gpio 36 0>;
