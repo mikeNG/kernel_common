@@ -3464,6 +3464,9 @@ static const struct reg_init {
 	/* Do not sync graphics cores from AXI. */
 	{GRP_2D_NS_REG, BM(14, 12), 0x0},
 	{GRP_NS_REG, BM(14, 12), 0x0},
+
+	/* MDP VSYNC src = LPXO. */
+	{MDP_VSYNC_REG, BM(3, 2), BVAL(3, 2, 0x1)},
 };
 
 static int gcc_msm7x30_clock_init(struct regmap *regmap)
