@@ -1012,7 +1012,7 @@ bool smem_initialized_check(void)
 	ver = smem->version[MODEM_SBL_VERSION_INDEX];
 	if (ver == SMEM_COMM_PART_VERSION << 16) {
 		use_comm_partition = true;
-	} else if (ver != SMEM_VERSION << 16) {
+	} else if (ver < SMEM_VERSION << 16) {
 		pr_err("%s: SBL version not correct 0x%x\n",
 				__func__, smem->version[7]);
 		goto failed;
