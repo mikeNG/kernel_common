@@ -24,6 +24,31 @@
 	regulator-max-microvolt = <3050000>;
 };
 
+&nand {
+	status = "ok";
+	nandcs@0 {
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label= "system";
+				reg = <0x5C80000 0x39780000>;
+			};
+			partition@1 {
+				label= "userdata";
+				reg = <0x3F400000 0x400000>;
+			};
+			partition@2 {
+				label= "cache";
+				reg = <0x3F800000 0x400000>;
+			};
+		};
+	};
+
+};
+
 &pm8058_gpio {
 	pm8058_keypad_gpios: pm8058_keypad_gpios {
 		kypd_sns {
