@@ -642,6 +642,42 @@
 				interrupts	= <44 0>;
 			};
 		};
+
+		vebi2_clock: vebi2-clock {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <1>;
+		};
+
+		nand: nand@A0200000 {
+			status = "disabled";
+			compatible = "qcom,ipq806x-nand";
+			reg = <0xA0200000 0x800>;
+
+			clocks = <&vebi2_clock>,
+				 <&vebi2_clock>;
+			clock-names = "core", "aon";
+
+			dmas = <&adm_dma 7>;
+			dma-names = "rxtx";
+			qcom,cmd-crci = <5>;
+			qcom,data-crci = <4>;
+
+			pinctrl-0 = <&nand_pins>;
+			pinctrl-names = "default";
+
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			nandcs@0 {
+				compatible = "qcom,nandcs";
+				reg = <0>;
+
+				nand-ecc-strength = <4>;
+				nand-ecc-step-size = <512>;
+				nand-bus-width = <16>;
+			};
+		};
 	};
 
 	qcom,smem@100000 {
@@ -726,6 +762,21 @@
 			function = "gpio";
 			bias-pull-none;
 			drive-strength = <16>;
+		};
+	};
+
+	nand_pins: nand_pins {
+		ebi2_cs1 {
+			pins = "gpio86";
+			function = "peripheral";
+			bias-pull-up;
+			drive-strength = <8>;
+		};
+		ebi2_busy1 {
+			pins = "gpio115";
+			function = "peripheral2";
+			bias-pull-up;
+			drive-strength = <8>;
 		};
 	};
 
