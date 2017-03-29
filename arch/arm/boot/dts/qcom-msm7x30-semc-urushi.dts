@@ -24,6 +24,18 @@
 	};
 };
 
+&msm_i2c_gpios {
+	i2c_sclsda {
+		drive-strength = <8>;
+	};
+};
+
+&msm_i2c_io_gpios {
+	i2c_sclsda {
+		drive-strength = <8>;
+	};
+};
+
 &sdc4_gpios {
 	sdc4_clkdat {
 		drive-strength = <4>;

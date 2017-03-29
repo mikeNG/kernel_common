@@ -23,3 +23,15 @@
 		pinctrl-0 = <&pm8058_keypad_gpios>;
 	};
 };
+
+&msm_i2c_gpios {
+	i2c_sclsda {
+		drive-strength = <4>;
+	};
+};
+
+&msm_i2c_io_gpios {
+	i2c_sclsda {
+		drive-strength = <4>;
+	};
+};
