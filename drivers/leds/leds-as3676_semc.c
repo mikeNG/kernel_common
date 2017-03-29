@@ -13,13 +13,131 @@
 #include <linux/leds.h>
 #include <linux/module.h>
 #include <linux/workqueue.h>
-#include <linux/leds-as3676_semc.h>
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
 #endif
 #include <linux/delay.h>
 
 #define AS3676_NAME "as3676"
+
+/*    ^
+ *    |          k2 /------- y3
+ *    |           \/
+ *    |        x2 /
+ *    |         |/
+ *    |      k1 /
+ *    |       \/
+ *    |       /
+ * y0-|------|
+ *    |      x1
+ *    +------------------------>
+ */
+
+enum as3676_amb_value {
+	AS3676_AMB_OFF,
+	AS3676_AMB_GROUP_1,
+	AS3676_AMB_GROUP_2,
+	AS3676_AMB_GROUP_3,
+	AS3676_AMB_MAX,
+
+	AS3676_AMB_MASK = 0x03
+};
+
+struct as3676_als_curve {
+	int y0; /* Current multiplier for < x1 */
+	int y3; /* Current multiplier for high values */
+	int k1; /* k1/32 = slope for > x1 < x2 */
+	int k2; /* k2/32 = slope for > x2 */
+	int x1;
+	int x2;
+};
+
+enum as3676_filter {
+	AS3676_FILTER_0_25HZ	= 0,
+	AS3676_FILTER_0_5HZ	= 1,
+	AS3676_FILTER_1HZ	= 2,
+	AS3676_FILTER_2HZ	= 3,
+	AS3676_FILTER_4HZ	= 4,
+	AS3676_FILTER_8HZ	= 5,
+	AS3676_FILTER_16HZ	= 6,
+	AS3676_FILTER_32HZ	= 7,
+
+	AS3676_FILTER_MAX,
+};
+
+enum as3676_gain {
+	AS3676_GAIN_0_25	= 0,
+	AS3676_GAIN_0_5		= 1,
+	AS3676_GAIN_1		= 2,
+	AS3676_GAIN_2		= 3,
+
+	AS3676_GAIN_MAX,
+};
+
+enum as3676_als_source {
+	AS3676_ALS_SOURCE_VANA	= 1,
+	AS3676_ALS_SOURCE_AUDIO	= 3,
+	AS3676_ALS_SOURCE_GPIO1	= 2,
+	AS3676_ALS_SOURCE_GPIO2	= 0,
+	AS3676_ALS_SOURCE_DCDC	= 22,
+};
+
+struct as3676_als_config {
+	enum as3676_filter filter_up;
+	enum as3676_filter filter_down;
+	enum as3676_gain gain;
+	int offset;
+	enum as3676_als_source source;
+	struct as3676_als_curve curve[AS3676_AMB_MAX];
+};
+
+struct as3676_audio_config {
+	int current_3x;
+	int audio_control;
+	int audio_input;
+	int audio_output;
+};
+
+enum as3676_sinks {
+	AS3676_SINK_01,
+	AS3676_SINK_02,
+	AS3676_SINK_06,
+	AS3676_SINK_30,
+	AS3676_SINK_31,
+	AS3676_SINK_32,
+	AS3676_SINK_33,
+	AS3676_SINK_41,
+	AS3676_SINK_42,
+	AS3676_SINK_43,
+	AS3676_SINK_RGB1,
+	AS3676_SINK_RGB2,
+	AS3676_SINK_RGB3,
+
+	AS3676_SINK_MAX,
+};
+
+enum as3676_led_flags {
+	AS3676_FLAG_RGB		= (1 << 0), /* is RGB */
+	AS3676_FLAG_BLINK	= (1 << 1), /* should have blinking */
+	AS3676_FLAG_ALS_GROUP1	= (1 << 2), /* connected to the ALS group1 */
+	AS3676_FLAG_ALS_GROUP2	= (1 << 3), /* connected to the ALS group2 */
+	AS3676_FLAG_ALS_GROUP3	= (1 << 4), /* connected to the ALS group3 */
+	AS3676_FLAG_PWM_INIT	= (1 << 5), /* should turn on slowly once */
+	AS3676_FLAG_PWM_CTRL	= (1 << 6),
+	AS3676_FLAG_DLS	= (1 << 7), /* should be connected to the DLS */
+	AS3676_FLAG_AUDIO 	= (1 << 8), /* should be connected to audio*/
+	AS3676_FLAG_WAIT_RESUME	= (1 << 9),
+					/* should not control during suspend */
+	AS3676_FLAG_ALS	= AS3676_FLAG_ALS_GROUP1,
+	AS3676_FLAG_ALS_MASK	= (AS3676_FLAG_ALS_GROUP1 |
+					AS3676_FLAG_ALS_GROUP2 |
+					AS3676_FLAG_ALS_GROUP3),
+};
+
+enum as3676_ldo {
+	AS3676_LDO_MIN = 1800,
+	AS3676_LDO_MAX = 3350,
+};
 
 enum as3676_cmode {
 	AS3676_CMODE_IMMEDIATE,
@@ -419,9 +537,10 @@ static const struct as3676_als_config as3676_default_config = {
 struct as3676_interface {
 	int index;
 	u64 regs;
-	int flags;
 	int max_current;
 	int hw_max_current;
+	int flags;
+	int sinks;
 	struct led_classdev cdev;
 	struct kobject kobj;
 };
@@ -454,6 +573,7 @@ struct as3676_record {
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	struct early_suspend early_suspend;
 #endif
+	int ldo_mV;
 };
 
 #define as3676_lock(rd) mutex_lock(&(rd)->lock)
@@ -799,9 +919,7 @@ static void as3676_set_interface_brightness(struct as3676_interface *intf,
 	int i;
 	enum as3676_cmode cmode;
 	struct as3676_record *rd;
-	struct as3676_platform_data *pdata;
 	rd = container_of(intf, struct as3676_record, interfaces[intf->index]);
-	pdata = rd->client->dev.platform_data;
 
 	cmode = rd->cmode;
 	rd->cmode = AS3676_CMODE_IMMEDIATE;
@@ -809,7 +927,7 @@ static void as3676_set_interface_brightness(struct as3676_interface *intf,
 	intf->cdev.brightness = value;
 
 	if (rd->audio_enabled || (rd->als_suspend == AS3676_NO_SUSPEND) ||
-		!(pdata->leds[intf->index].flags & AS3676_FLAG_WAIT_RESUME)) {
+		!(intf->flags & AS3676_FLAG_WAIT_RESUME)) {
 		if (intf->max_current)
 			value = (value * intf->max_current)
 							/ AS3676_MAX_CURRENT;
@@ -1106,7 +1224,7 @@ static ssize_t as3676_als_enable_store(struct kobject *kobj,
 	intf = container_of(kobj, struct as3676_interface, kobj);
 	rd = container_of(intf, struct as3676_record, interfaces[intf->index]);
 
-	ret = strict_strtoul(buf, 0, &enable);
+	ret = kstrtoul(buf, 0, &enable);
 	if (ret < 0 || (enable != 1 && enable != 0))
 		return -EINVAL;
 
@@ -1330,22 +1448,20 @@ static ssize_t as3676_max_current_store(struct device *dev,
 	unsigned long curr_val;
 	struct as3676_record *rd;
 	struct as3676_interface *intf;
-        struct led_classdev *led_cdev = dev_get_drvdata(dev);
-	struct as3676_platform_data *pdata;
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
 
 	intf = container_of(led_cdev, struct as3676_interface, cdev);
 	rd = container_of(intf, struct as3676_record, interfaces[intf->index]);
 
-	ret = strict_strtoul(buf, 10, &curr_val);
+	ret = kstrtoul(buf, 10, &curr_val);
 
 	if (ret != 0 || curr_val == 0)
 		return -EINVAL;
 
 	as3676_lock(rd);
-	pdata = rd->client->dev.platform_data;
 
-	if (curr_val > pdata->leds[intf->index].hw_max_current)
-		curr_val = pdata->leds[intf->index].hw_max_current;
+	if (curr_val > intf->hw_max_current)
+		curr_val = intf->hw_max_current;
 
 	intf->max_current = (int)curr_val;
 	as3676_unlock(rd);
@@ -1379,7 +1495,7 @@ static ssize_t as3676_mode_store(struct device *dev,
 	intf = container_of(led_cdev, struct as3676_interface, cdev);
 	rd = container_of(intf, struct as3676_record, interfaces[intf->index]);
 
-	ret = strict_strtoul(buf, 10, &mode);
+	ret = kstrtoul(buf, 10, &mode);
 
 	if ((ret != 0) || (mode > AS3676_CTRL_PWM))
 		return -EINVAL;
@@ -1660,6 +1776,13 @@ static const struct i2c_device_id as3676_idtable[] = {
 
 MODULE_DEVICE_TABLE(i2c, as3676_idtable);
 
+static const struct of_device_id as3676_oftable[] = {
+	{ .compatible = "ams,as3676" },
+	{}
+};
+
+MODULE_DEVICE_TABLE(of, as3676_oftable);
+
 static const struct dev_pm_ops as3676_pm = {
 	.suspend = as3676_pm_suspend,
 	.resume = as3676_pm_resume,
@@ -1670,6 +1793,7 @@ static struct i2c_driver as3676_driver = {
 		.owner = THIS_MODULE,
 		.name = AS3676_NAME,
 		.pm = &as3676_pm,
+		.of_match_table = as3676_oftable,
 	},
 	.probe   = as3676_probe,
 	.remove  = as3676_remove,
@@ -1677,36 +1801,140 @@ static struct i2c_driver as3676_driver = {
 	.id_table = as3676_idtable,
 };
 
+static int as3676_parse_dt(struct as3676_record *rd, struct device *dev)
+{
+	struct device_node *node = dev->of_node;
+	struct device_node *child;
+	int i = 0;
+	int ret = 0;
+
+	rd->als_connected = of_property_read_bool(node, "als-connected");
+	rd->dls_connected = of_property_read_bool(node, "dls-connected");
+
+	of_property_read_u32(node, "als-wait", &rd->als_wait);
+	of_property_read_u32(node, "ldo-mv", &rd->ldo_mV);
+
+	/* Audio configuration, optional. */
+	of_property_read_u32(node, "current-3x", &rd->audio.current_3x);
+	of_property_read_u32(node, "audio-control", &rd->audio.audio_control);
+	of_property_read_u32(node, "audio-input", &rd->audio.audio_input);
+	of_property_read_u32(node, "audio-output", &rd->audio.audio_output);
+
+	/* TODO: ALS configuration, optional. */
+	memcpy(&rd->als, &as3676_default_config,
+	       sizeof(struct as3676_als_config));
+
+	rd->n_interfaces = of_get_child_count(node);
+	for_each_available_child_of_node(node, child) {
+		struct as3676_interface *intf = &rd->interfaces[i];
+
+		ret |= of_property_read_string(child, "label",
+					       &intf->cdev.name);
+		of_property_read_u32(child, "default-brightness",
+				     &intf->cdev.brightness);
+		ret |= of_property_read_u32(child, "max-current",
+					    &intf->max_current);
+		ret |= of_property_read_u32(child, "hw-max-current",
+					    &intf->hw_max_current);
+
+		if (of_property_read_bool(child, "flag-rgb"))
+			intf->flags |= AS3676_FLAG_RGB;
+
+		if (of_property_read_bool(child, "flag-blink"))
+			intf->flags |= AS3676_FLAG_BLINK;
+
+		if (of_property_read_bool(child, "flag-als-group1"))
+			intf->flags |= AS3676_FLAG_ALS_GROUP1;
+
+		if (of_property_read_bool(child, "flag-als-group2"))
+			intf->flags |= AS3676_FLAG_ALS_GROUP2;
+
+		if (of_property_read_bool(child, "flag-als-group3"))
+			intf->flags |= AS3676_FLAG_ALS_GROUP3;
+
+		if (of_property_read_bool(child, "flag-pwm-init"))
+			intf->flags |= AS3676_FLAG_PWM_INIT;
+
+		if (of_property_read_bool(child, "flag-pwm-ctrl"))
+			intf->flags |= AS3676_FLAG_PWM_CTRL;
+
+		if (of_property_read_bool(child, "flag-dls"))
+			intf->flags |= AS3676_FLAG_DLS;
+
+		if (of_property_read_bool(child, "flag-audio"))
+			intf->flags |= AS3676_FLAG_AUDIO;
+
+		if (of_property_read_bool(child, "flag-wait-resume"))
+			intf->flags |= AS3676_FLAG_WAIT_RESUME;
+
+		if (of_property_read_bool(child, "sink-01"))
+			intf->sinks |= BIT(AS3676_SINK_01);
+
+		if (of_property_read_bool(child, "sink-02"))
+			intf->sinks |= BIT(AS3676_SINK_02);
+
+		if (of_property_read_bool(child, "sink-06"))
+			intf->sinks |= BIT(AS3676_SINK_06);
+
+		if (of_property_read_bool(child, "sink-30"))
+			intf->sinks |= BIT(AS3676_SINK_30);
+
+		if (of_property_read_bool(child, "sink-31"))
+			intf->sinks |= BIT(AS3676_SINK_31);
+
+		if (of_property_read_bool(child, "sink-32"))
+			intf->sinks |= BIT(AS3676_SINK_32);
+
+		if (of_property_read_bool(child, "sink-33"))
+			intf->sinks |= BIT(AS3676_SINK_33);
+
+		if (of_property_read_bool(child, "sink-41"))
+			intf->sinks |= BIT(AS3676_SINK_41);
+
+		if (of_property_read_bool(child, "sink-42"))
+			intf->sinks |= BIT(AS3676_SINK_42);
+
+		if (of_property_read_bool(child, "sink-43"))
+			intf->sinks |= BIT(AS3676_SINK_43);
+
+		if (of_property_read_bool(child, "sink-rgb1"))
+			intf->sinks |= BIT(AS3676_SINK_RGB1);
+
+		if (of_property_read_bool(child, "sink-rgb2"))
+			intf->sinks |= BIT(AS3676_SINK_RGB2);
+
+		if (of_property_read_bool(child, "sink-rgb3"))
+			intf->sinks |= BIT(AS3676_SINK_RGB3);
+
+		if (ret) {
+			dev_err(dev, "led %d has invalid configuration\n", i);
+			/* Continue parsing. */
+			ret = 0;
+		}
+		i++;
+	}
+
+	return 0;
+}
+
 static int as3676_probe(struct i2c_client *client,
 		const struct i2c_device_id *id)
 {
+	struct device *dev = &client->dev;
 	struct as3676_record *rd = 0;
-	struct as3676_platform_data *pdata;
 	int err;
 	int i, j;
 	int ldo_val;
 
-	pdata = client->dev.platform_data;
-
-	if (!pdata || pdata->num_leds == 0) {
-		dev_err(&client->dev, "no/bad pdata provided\n");
-		return -EFAULT;
-	}
-
-	if (pdata->num_leds > AS3676_INTERFACE_MAX) {
-		dev_err(&client->dev, "pdata specifies too many leds\n");
-		return -EFAULT;
-	}
-
-	rd = kzalloc(sizeof(struct as3676_record), GFP_KERNEL);
+	rd = devm_kzalloc(dev, sizeof(struct as3676_record), GFP_KERNEL);
 	if (!rd)
 		return -ENOMEM;
 
-	rd->als_connected = pdata->als_connected;
-	rd->als_wait = pdata->als_wait;
-	rd->dls_connected = pdata->dls_connected;
-
-	client->driver = &as3676_driver;
+	err = as3676_parse_dt(rd, dev);
+	if (err) {
+		dev_err(dev, "failed to parse device tree\n");
+		return err;
+	}
 
 	mutex_init(&rd->lock);
 	INIT_WORK(&rd->work, as3676_worker);
@@ -1721,25 +1949,17 @@ static int as3676_probe(struct i2c_client *client,
 	i2c_set_clientdata(client, rd);
 	dev_set_drvdata(&client->dev, rd);
 
-	rd->n_interfaces = pdata->num_leds;
-
 	for (i = 0; i < rd->n_interfaces; ++i) {
-		struct as3676_platform_led *led = &pdata->leds[i];
 		struct as3676_interface *intf = &rd->interfaces[i];
-		intf->cdev.name           = led->name;
-		intf->cdev.brightness     = led->default_brightness;
 		intf->cdev.brightness_set = as3676_brightness;
 #ifdef CONFIG_LEDS_AS3676_HW_BLINK
-		if (led->flags & AS3676_FLAG_BLINK)
+		if (intf->flags & AS3676_FLAG_BLINK)
 			intf->cdev.blink_set = as3676_blink;
 #endif
-		intf->flags = led->flags;
-		intf->max_current = led->max_current;
-		intf->hw_max_current = led->hw_max_current;
 		intf->index = i;
 
 		for (j = 0; j < AS3676_SINK_MAX; ++j) {
-			if (led->sinks & BIT(j)) {
+			if (intf->sinks & BIT(j)) {
 				intf->regs |= ((u64)1 << as3676_sink_map[j]);
 				if (as3676_sink[as3676_sink_map[j]].flags &
 						AS3676_FLAG_DCDC_CTRL) {
@@ -1775,15 +1995,14 @@ static int as3676_probe(struct i2c_client *client,
 	/* TODO: double check that these are appropriate according to pdata */
 	reg_set(rd, AS3676_REG_CTRL, 0x05);
 
-	if (pdata->ldo_mV <= 0) {
+	if (rd->ldo_mV <= 0) {
 		ldo_val = 0x1f;
-	} else if ((pdata->ldo_mV < AS3676_LDO_MIN) ||
-			(pdata->ldo_mV > AS3676_LDO_MAX)) {
-		dev_err(&client->dev, "ldo_mV in pdata is out-of-range\n");
-		err = -EINVAL;
-		goto error;
+	} else if ((rd->ldo_mV < AS3676_LDO_MIN) ||
+			(rd->ldo_mV > AS3676_LDO_MAX)) {
+		dev_err(&client->dev, "ldo_mV is out-of-range\n");
+		return -EINVAL;
 	} else {
-		ldo_val = (pdata->ldo_mV - AS3676_LDO_MIN) / 50;
+		ldo_val = (rd->ldo_mV - AS3676_LDO_MIN) / 50;
 	}
 
 	reg_set(rd, AS3676_LDO_VOLTAGE, ldo_val);
@@ -1792,22 +2011,6 @@ static int as3676_probe(struct i2c_client *client,
 	/* Allow dimming up */
 	reg_set(rd, AS3676_REG_PWM_CODE, 0);
 	reg_set(rd, AS3676_REG_PWM_CTRL, 4<<3 | 1<<1);
-
-	if (pdata->als_config) {
-		memcpy(&rd->als, pdata->als_config,
-				sizeof(struct as3676_als_config));
-	} else {
-		memcpy(&rd->als, &as3676_default_config,
-				sizeof(struct as3676_als_config));
-	}
-
-	if (pdata->audio_config) {
-		memcpy(&rd->audio, pdata->audio_config,
-				sizeof(struct as3676_audio_config));
-	} else {
-		memset(&rd->audio, 0,
-				sizeof(struct as3676_audio_config));
-	}
 
 	if (rd->als_connected) {
 		as3676_als_set_params(rd, &rd->als);
@@ -1836,10 +2039,6 @@ static int as3676_probe(struct i2c_client *client,
 	register_early_suspend(&rd->early_suspend);
 #endif
 	return 0;
-
-error:
-	kfree(rd);
-	return err;
 }
 
 module_i2c_driver(as3676_driver);
