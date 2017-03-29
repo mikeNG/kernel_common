@@ -8,3 +8,47 @@
 			<0X40000000 0X10000000>;
 	};
 };
+
+&i2c0 {
+	as3676@40 {
+		dls-connected;
+
+		lcd-backlight {
+			label = "lcd-backlight";
+			max-current = <20000>;
+			hw-max-current = <25000>;
+			default-brightness = <255>;
+			sink-01;
+			flag-pwm-ctrl;
+			flag-pwm-init;
+			flag-wait-resume;
+		};
+
+		red {
+			label = "red";
+			max-current = <3000>;
+			hw-max-current = <25000>;
+			sink-41;
+			flag-rgb;
+			flag-blink;
+		};
+
+		green {
+			label = "green";
+			max-current = <3000>;
+			hw-max-current = <25000>;
+			sink-42;
+			flag-rgb;
+			flag-blink;
+		};
+
+		blue {
+			label = "blue";
+			max-current = <3000>;
+			hw-max-current = <25000>;
+			sink-43;
+			flag-rgb;
+			flag-blink;
+		};
+	};
+};

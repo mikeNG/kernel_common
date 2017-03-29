@@ -1,5 +1,15 @@
 #include "qcom-msm7x30.dtsi"
 
+&i2c0 {
+	as3676@40 {
+		compatible = "ams,as3676";
+		reg = <0x40>;
+
+		als-connected;
+		ldo-mv = <3300>;
+	};
+};
+
 &ldo6 {
 	regulator-max-microvolt = <3500000>;
 };
