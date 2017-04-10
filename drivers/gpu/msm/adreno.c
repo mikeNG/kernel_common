@@ -19,6 +19,9 @@
 #include <linux/of_device.h>
 #include <linux/msm_kgsl.h>
 #include <linux/delay.h>
+#ifdef CONFIG_MSM_DALRPC
+#include <soc/qcom/dal_axi.h>
+#endif
 
 #include "kgsl.h"
 #include "kgsl_pwrscale.h"
@@ -1226,6 +1229,10 @@ static int adreno_of_get_pdata(struct platform_device *pdev)
 	if (adreno_of_read_property(pdev->dev.of_node, "qcom,clk-map",
 		&pdata->clk_map))
 		goto err;
+
+#ifdef CONFIG_MSM_DALRPC
+	pdata->set_grp_async = set_grp3d_async;
+#endif
 
 	device = (struct kgsl_device *)pdev->id_entry->driver_data;
 
