@@ -1,4 +1,4 @@
-/* include/linux/clearpad.h
+/* linux/drivers/input/touchscreen/clearpad.h
  *
  * Copyright (C) [2010] Sony Ericsson Mobile Communications AB.
  *
@@ -17,38 +17,6 @@
 #define CLEARPAD_NAME "clearpad"
 #define CLEARPADI2C_NAME "clearpad-i2c"
 
-enum synaptics_funcarea_kind {
-	SYN_FUNCAREA_INSENSIBLE,
-	SYN_FUNCAREA_POINTER,
-	SYN_FUNCAREA_BOTTOM_EDGE,
-	SYN_FUNCAREA_BUTTON,
-	SYN_FUNCAREA_BTN_INBOUND,
-	SYN_FUNCAREA_END,
-};
-
-struct synaptics_funcarea {
-	int x1;
-	int y1;
-	int x2;
-	int y2;
-	enum synaptics_funcarea_kind func;
-	void *data;
-};
-
-struct synaptics_button {
-	int type;
-	int code;
-	bool down;
-	bool down_report;
-};
-
-struct clearpad_platform_data {
-	int irq;
-	struct synaptics_funcarea *funcarea; /* last one = SYN_FUNCAREA_END */
-	int (*vreg_configure)(int);
-	int (*gpio_configure)(int);
-};
-
 struct clearpad_bus_data {
 	__u16 bustype;
 	int (*read)(struct device *dev, u8 reg, u8 *buf, u8 len);
@@ -56,7 +24,7 @@ struct clearpad_bus_data {
 };
 
 struct clearpad_data {
-	struct clearpad_platform_data *pdata;
+	int irq;
 	struct clearpad_bus_data *bdata;
 };
 #endif

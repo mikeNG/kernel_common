@@ -9,11 +9,11 @@
  * published by the Free Software Foundation.
  */
 
-#include <linux/module.h>
-#include <linux/platform_device.h>
 #include <linux/i2c.h>
 #include <linux/input.h>
-#include <linux/clearpad.h>
+#include <linux/module.h>
+#include <linux/platform_device.h>
+#include "clearpad.h"
 
 static int clearpad_i2c_read(struct device *dev, u8 reg, u8 *buf, u8 len)
 {
@@ -57,7 +57,7 @@ static int clearpad_i2c_probe(struct i2c_client *client,
 				      const struct i2c_device_id *id)
 {
 	struct clearpad_data clearpad_data = {
-		.pdata = client->dev.platform_data,
+		.irq = client->irq,
 		.bdata = &clearpad_i2c_bus_data,
 	};
 	struct platform_device *pdev;
@@ -89,6 +89,12 @@ err_device_put:
 	return rc;
 }
 
+static const struct of_device_id clearpad_of_match[] = {
+	{ .compatible = "synaptics,i2c-clearpad", },
+	{},
+};
+MODULE_DEVICE_TABLE(of, clearpad_of_match);
+
 static const struct i2c_device_id clearpad_id[] = {
 	{ CLEARPADI2C_NAME, 0 },
 	{ }
@@ -99,11 +105,11 @@ static struct i2c_driver clearpad_i2c_driver = {
 	.driver = {
 		.owner	= THIS_MODULE,
 		.name	= CLEARPADI2C_NAME,
+		.of_match_table = clearpad_of_match,
 	},
 	.id_table	= clearpad_id,
 	.probe		= clearpad_i2c_probe,
 };
-
 module_i2c_driver(clearpad_i2c_driver);
 
 MODULE_DESCRIPTION(CLEARPADI2C_NAME "ClearPad I2C Driver");

@@ -11,26 +11,19 @@
  */
 
 #include <linux/platform_device.h>
-#include <linux/irq.h>
 #include <linux/input.h>
 #include <linux/module.h>
 #include <linux/workqueue.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/miscdevice.h>
-#include <linux/clearpad.h>
-#include <mach/gpio.h>
-#include <linux/ctype.h>
 #include <linux/firmware.h>
-#include <linux/slab.h>
-#include <linux/sched.h>
 #ifdef CONFIG_FB
 #include <linux/notifier.h>
 #include <linux/fb.h>
 #endif
-#ifdef CONFIG_ARM
-#include <asm/mach-types.h>
-#endif
+#include <linux/regulator/consumer.h>
+#include "clearpad.h"
 
 #define SYNAPTICS_CLEARPAD_VENDOR		0x1
 #define SYNAPTICS_MAX_N_FINGERS			10
@@ -83,6 +76,34 @@ do {					\
 	mutex_unlock(&this->lock);	\
 	LOG_VERBOSE(this, "UNLOCK\n");	\
 } while (0)
+
+enum synaptics_funcarea_kind {
+	SYN_FUNCAREA_INSENSIBLE,
+	SYN_FUNCAREA_POINTER,
+	SYN_FUNCAREA_BOTTOM_EDGE,
+	SYN_FUNCAREA_BUTTON,
+	SYN_FUNCAREA_BTN_INBOUND,
+	SYN_FUNCAREA_END,
+};
+
+struct synaptics_button {
+	int type;
+	int code;
+	bool down;
+	bool down_report;
+};
+
+struct synaptics_funcarea {
+	int x1;
+	int y1;
+	int x2;
+	int y2;
+	enum synaptics_funcarea_kind func;
+
+	union {
+		struct synaptics_button button;
+	};
+};
 
 enum synaptics_state {
 	SYN_STATE_INIT,
@@ -270,12 +291,12 @@ struct synaptics_clearpad {
 	enum   synaptics_task task;
 	struct input_dev *input;
 	struct platform_device *pdev;
-	struct clearpad_platform_data *pdata;
 	struct clearpad_bus_data *bdata;
 	struct mutex lock;
 	struct work_struct work;
 	struct synaptics_device_info device_info;
 	struct synaptics_funcarea *funcarea;
+	int funcarea_count;
 	struct synaptics_pointer pointer[SYNAPTICS_MAX_N_FINGERS];
 	struct synaptics_function_descriptor pdt[SYN_N_FUNCTIONS];
 	struct synaptics_flash_image flash;
@@ -291,6 +312,10 @@ struct synaptics_clearpad {
 	char result_info[SYNAPTICS_STRING_LENGTH + 1];
 	wait_queue_head_t task_none_wq;
 	bool flash_requested;
+
+	struct regulator *vdd;
+	struct regulator *vio;
+	int irq;
 };
 
 static char *make_string(u8 *array, size_t size)
@@ -356,10 +381,10 @@ static void synaptics_clearpad_set_irq(struct synaptics_clearpad *this,
 
 	if (mask && !this->irq_mask) {
 		LOG_STAT(this, "enable IRQ (user_mask 0x%02x)\n", mask);
-		enable_irq(this->pdata->irq);
+		enable_irq(this->irq);
 	} else if (!mask && this->irq_mask) {
 		LOG_STAT(this, "disable IRQ (user_mask 0x%02x)\n", mask);
-		disable_irq(this->pdata->irq);
+		disable_irq(this->irq);
 	} else
 		LOG_STAT(this, "no change IRQ (%s)\n",
 				mask ? "enable" : "disable");
@@ -994,23 +1019,60 @@ err_unlock:
 
 static void synaptics_funcarea_initialize(struct synaptics_clearpad *this)
 {
-	struct synaptics_funcarea *funcarea;
-	struct synaptics_button *button;
+	/* Get parent node to parse function area. */
+	struct device_node *node = this->pdev->dev.parent->of_node;
+	struct device_node *child;
+	int i;
+
 	const char *func_name[] = {
 		[SYN_FUNCAREA_INSENSIBLE] = "insensible",
 		[SYN_FUNCAREA_POINTER] = "pointer",
 		[SYN_FUNCAREA_BUTTON] = "button",
 	};
 
-	this->funcarea = this->pdata->funcarea;
-	funcarea = this->funcarea;
+	this->funcarea_count = of_get_child_count(node);
 
-	if (funcarea == NULL) {
+	this->funcarea = devm_kcalloc(&this->pdev->dev, this->funcarea_count,
+				      sizeof(*this->funcarea), GFP_KERNEL);
+	if (this->funcarea == NULL) {
 		dev_info(&this->pdev->dev, "no funcarea\n");
 		return;
 	}
 
-	for (; funcarea->func != SYN_FUNCAREA_END; funcarea++) {
+	i = 0;
+	for_each_child_of_node(node, child) {
+		struct synaptics_funcarea *funcarea = &this->funcarea[i];
+
+		of_property_read_u32(child, "syn,x1", &funcarea->x1);
+		of_property_read_u32(child, "syn,y1", &funcarea->y1);
+		of_property_read_u32(child, "syn,x2", &funcarea->x2);
+		of_property_read_u32(child, "syn,y2", &funcarea->y2);
+
+		if (of_property_read_bool(child, "syn,insensible"))
+			funcarea->func = SYN_FUNCAREA_INSENSIBLE;
+		else if (of_property_read_bool(child, "syn,pointer"))
+			funcarea->func = SYN_FUNCAREA_POINTER;
+		else if (of_property_read_bool(child, "syn,bottom-edge"))
+			funcarea->func = SYN_FUNCAREA_BOTTOM_EDGE;
+		else if (of_property_read_bool(child, "syn,bottom"))
+			funcarea->func = SYN_FUNCAREA_BUTTON;
+		else if (of_property_read_bool(child, "syn,button-inbound"))
+			funcarea->func = SYN_FUNCAREA_BTN_INBOUND;
+
+		if (funcarea->func == SYN_FUNCAREA_BUTTON ||
+		    funcarea->func == SYN_FUNCAREA_BTN_INBOUND) {
+			of_property_read_u32(child, "linux,type",
+					     &funcarea->button.type);
+			of_property_read_u32(child, "linux,code",
+					     &funcarea->button.code);
+		}
+
+		i++;
+	}
+
+	for (i = 0; i < this->funcarea_count; i++) {
+		struct synaptics_funcarea *funcarea = &this->funcarea[i];
+
 		switch (funcarea->func) {
 		case SYN_FUNCAREA_POINTER:
 			input_set_abs_params(this->input, ABS_MT_POSITION_X,
@@ -1027,9 +1089,9 @@ static void synaptics_funcarea_initialize(struct synaptics_clearpad *this)
 					-1, 1, 0, 0);
 			break;
 		case SYN_FUNCAREA_BUTTON:
-			button = (struct synaptics_button *)funcarea->data;
 			input_set_capability(this->input,
-					     button->type, button->code);
+					     funcarea->button.type,
+					     funcarea->button.code);
 			break;
 		default:
 			continue;
@@ -1052,12 +1114,10 @@ static struct synaptics_funcarea *
 synaptics_funcarea_search(struct synaptics_clearpad *this,
 			  struct synaptics_point *point)
 {
-	struct synaptics_funcarea *funcarea = this->funcarea;
+	int i;
 
-	if (funcarea == NULL)
-		return NULL;
-
-	for ( ; funcarea->func != SYN_FUNCAREA_END; funcarea++) {
+	for (i = 0; i < this->funcarea_count; i++) {
+		struct synaptics_funcarea *funcarea = &this->funcarea[i];
 		if (synaptics_funcarea_test(funcarea, point))
 			return funcarea;
 	}
@@ -1095,8 +1155,7 @@ static int synaptics_funcarea_down(struct synaptics_clearpad *this,
 				   int id, int x, int y, int wx, int wy, int z)
 {
 	int touch_major, touch_minor;
-	struct synaptics_funcarea *funcarea = this->funcarea;
-	struct synaptics_button *button;
+	int i;
 	struct synaptics_pointer previous_pointer;
 	previous_pointer.funcarea = pointer->funcarea;
 
@@ -1120,7 +1179,8 @@ static int synaptics_funcarea_down(struct synaptics_clearpad *this,
 		return 0;
 	case SYN_FUNCAREA_BOTTOM_EDGE:
 		LOG_EVENT(this, "bottom edge\n");
-		for (; funcarea->func != SYN_FUNCAREA_END; funcarea++) {
+		for (i = 0; i < this->funcarea_count; i++) {
+			struct synaptics_funcarea *funcarea = &this->funcarea[i];
 			if (funcarea->func == SYN_FUNCAREA_POINTER) {
 				pointer->funcarea = funcarea;
 				break;
@@ -1145,9 +1205,7 @@ static int synaptics_funcarea_down(struct synaptics_clearpad *this,
 		return 1;
 	case SYN_FUNCAREA_BUTTON:
 		LOG_EVENT(this, "button");
-		button = (struct synaptics_button *)pointer->funcarea->data;
-		if (button)
-			button->down = true;
+		pointer->funcarea->button.down = true;
 		return 0;
 	default:
 		break;
@@ -1159,8 +1217,6 @@ static int synaptics_funcarea_down(struct synaptics_clearpad *this,
 static int synaptics_funcarea_up(struct synaptics_clearpad *this,
 				 struct synaptics_pointer *pointer)
 {
-	struct synaptics_button *button;
-
 	if (pointer->funcarea == NULL)
 		return 0;
 
@@ -1171,9 +1227,7 @@ static int synaptics_funcarea_up(struct synaptics_clearpad *this,
 	case SYN_FUNCAREA_BUTTON:
 	case SYN_FUNCAREA_BTN_INBOUND:
 		LOG_EVENT(this, "button up\n");
-		button = (struct synaptics_button *)pointer->funcarea->data;
-		if (button)
-			button->down = false;
+		pointer->funcarea->button.down = false;
 		break;
 	default:
 		break;
@@ -1205,18 +1259,12 @@ static void synaptics_report_button(struct synaptics_clearpad *this,
 static void
 synaptics_funcarea_report_extra_events(struct synaptics_clearpad *this)
 {
-	struct synaptics_funcarea *funcarea = this->funcarea;
-	struct synaptics_button *button;
-
-	if (funcarea == NULL)
-		return;
-
-	for (; funcarea->func != SYN_FUNCAREA_END; funcarea++) {
+	int i;
+	for (i = 0; i < this->funcarea_count; i++) {
+		struct synaptics_funcarea *funcarea = &this->funcarea[i];
 		if (funcarea->func == SYN_FUNCAREA_BUTTON ||
 			funcarea->func == SYN_FUNCAREA_BTN_INBOUND) {
-			button = (struct synaptics_button *)funcarea->data;
-			if (button)
-				synaptics_report_button(this, button);
+			synaptics_report_button(this, &funcarea->button);
 		}
 	}
 }
@@ -1377,8 +1425,7 @@ static void synaptics_clearpad_worker(struct work_struct *work)
 
 static irqreturn_t synaptics_clearpad_irq(int irq, void *dev_id)
 {
-	struct device *dev = dev_id;
-	struct synaptics_clearpad *this = dev_get_drvdata(dev);
+	struct synaptics_clearpad *this = dev_id;
 
 	if (this)
 		schedule_work(&this->work);
@@ -1709,7 +1756,7 @@ static ssize_t synaptics_clearpad_hwtest_store(struct device *dev,
 		goto err_invalid_arg;
 
 	str_num = buf + HWTEST_SIZE_OF_COMMAND_PREFIX;
-	rc = strict_strtoul(str_num, 16, &arg);
+	rc = kstrtoul(str_num, 16, &arg);
 	if (rc)
 		goto err_invalid_arg;
 
@@ -1740,13 +1787,13 @@ err_invalid_arg:
 	return -EINVAL;
 }
 
-static DEVICE_ATTR(fwinfo, 0600, synaptics_clearpad_state_show, 0);
-static DEVICE_ATTR(fwfamily, 0600, synaptics_clearpad_state_show, 0);
-static DEVICE_ATTR(fwrevision, 0604, synaptics_clearpad_state_show, 0);
-static DEVICE_ATTR(fwtask, 0600, synaptics_clearpad_state_show, 0);
-static DEVICE_ATTR(fwstate, 0600, synaptics_clearpad_state_show, 0);
-static DEVICE_ATTR(fwflush, 0600, 0, synaptics_clearpad_fwflush_store);
-static DEVICE_ATTR(hwtest, 0600, 0, synaptics_clearpad_hwtest_store);
+static DEVICE_ATTR(fwinfo, 0600, synaptics_clearpad_state_show, NULL);
+static DEVICE_ATTR(fwfamily, 0600, synaptics_clearpad_state_show, NULL);
+static DEVICE_ATTR(fwrevision, 0600, synaptics_clearpad_state_show, NULL);
+static DEVICE_ATTR(fwtask, 0600, synaptics_clearpad_state_show, NULL);
+static DEVICE_ATTR(fwstate, 0600, synaptics_clearpad_state_show, NULL);
+static DEVICE_ATTR(fwflush, 0600, NULL, synaptics_clearpad_fwflush_store);
+static DEVICE_ATTR(hwtest, 0600, NULL, synaptics_clearpad_hwtest_store);
 
 static struct attribute *synaptics_clearpad_attributes[] = {
 	&dev_attr_fwinfo.attr,
@@ -1882,12 +1929,13 @@ static int fb_notifier_callback(struct notifier_block *self,
 
 static int clearpad_probe(struct platform_device *pdev)
 {
-	struct clearpad_data *cdata = pdev->dev.platform_data;
+	struct device *dev = &pdev->dev;
+	struct clearpad_data *cdata = dev->platform_data;
 	struct synaptics_clearpad *this;
 	int rc;
 	int i;
 
-	this = kzalloc(sizeof(struct synaptics_clearpad), GFP_KERNEL);
+	this = devm_kzalloc(dev, sizeof(*this), GFP_KERNEL);
 	if (!this)
 		return -ENOMEM;
 
@@ -1895,38 +1943,53 @@ static int clearpad_probe(struct platform_device *pdev)
 	INIT_WORK(&this->work, synaptics_clearpad_worker);
 	init_waitqueue_head(&this->task_none_wq);
 
-	dev_set_drvdata(&pdev->dev, this);
+	platform_set_drvdata(pdev, this);
 	this->pdev = pdev;
-	this->pdata = cdata->pdata;
-	if (!this->pdata) {
-		dev_err(&this->pdev->dev, "no platform data\n");
-		rc = -EINVAL;
-		goto err_free;
-	}
+	this->irq = cdata->irq;
 	this->bdata = cdata->bdata;
 	if (!this->bdata) {
-		dev_err(&this->pdev->dev, "no bus data\n");
-		rc = -EINVAL;
-		goto err_free;
+		dev_err(dev, "no bus data\n");
+		return -EINVAL;
 	}
 
-	if (this->pdata->vreg_configure) {
-		rc = this->pdata->vreg_configure(1);
-		if (rc) {
-			dev_err(&this->pdev->dev,
-			       "failed vreg init\n");
-			goto err_free;
-		}
+	this->vdd = devm_regulator_get(dev->parent, "vdd");
+	if (IS_ERR(this->vdd)) {
+		dev_err(dev, "failed to get regulator 'vdd'\n");
+		return PTR_ERR(this->vdd);
 	}
 
-	if (this->pdata->gpio_configure) {
-		rc = this->pdata->gpio_configure(1);
-		if (rc) {
-			dev_err(&this->pdev->dev,
-			       "failed gpio init\n");
-			goto err_vreg_teardown;
-		}
+	rc = regulator_set_voltage(this->vdd, 3050000, 3050000);
+	if (rc) {
+		dev_err(dev, "failed to set voltage for 'vdd'\n");
+		return rc;
 	}
+
+	rc = regulator_enable(this->vdd);
+	if (rc) {
+		dev_err(dev, "failed to enable 'vdd'\n");
+		return rc;
+	}
+
+	this->vio = devm_regulator_get(dev->parent, "vio");
+	if (IS_ERR(this->vio)) {
+		dev_err(dev, "failed to get regulator 'vio'\n");
+		return PTR_ERR(this->vio);
+	}
+
+	rc = regulator_set_voltage(this->vio, 1800000, 1800000);
+	if (rc) {
+		dev_err(dev, "failed to set voltage for 'vio'\n");
+		return rc;
+	}
+
+	rc = regulator_enable(this->vio);
+	if (rc) {
+		dev_err(dev, "failed to enable 'vio'\n");
+		return rc;
+	}
+
+	/* At this stage GPIOs are configured with pinctrl and device is
+	 * powered. */
 
 	msleep(400);
 
@@ -1934,7 +1997,7 @@ static int clearpad_probe(struct platform_device *pdev)
 
 	rc = synaptics_clearpad_input_init(this);
 	if (rc)
-		goto err_gpio_teardown;
+		goto err_vreg_teardown;
 
 	for (i = 0; i < SYNAPTICS_RETRY_NUM_OF_INITIAL_CHECK; i++) {
 		u8 buf = 0;
@@ -1944,14 +2007,12 @@ static int clearpad_probe(struct platform_device *pdev)
 		if (DEVICE_STATUS_UNCONFIGURED_RESET_OCCURRED == buf) {
 			rc = synaptics_clearpad_initialize(this);
 			if (rc) {
-				dev_err(&this->pdev->dev,
-						"failed initialization\n");
+				dev_err(dev, "failed initialization\n");
 				goto err_input_unregister;
 			}
 			break;
 		} else {
-			dev_info(&this->pdev->dev,
-					"initial check fail: retry = %d\n", i);
+			dev_info(dev, "initial check fail: retry = %d\n", i);
 			msleep(100);
 		}
 	}
@@ -1965,7 +2026,7 @@ static int clearpad_probe(struct platform_device *pdev)
 	this->fb_notif.notifier_call = fb_notifier_callback;
 	rc = fb_register_client(&this->fb_notif);
 	if (rc) {
-		dev_err(&this->pdev->dev, "failed to register fb_notifier\n");
+		dev_err(dev, "failed to register fb_notifier\n");
 		goto err_input_unregister;
 	}
 #endif
@@ -1977,17 +2038,16 @@ static int clearpad_probe(struct platform_device *pdev)
 		goto err_fb_notif;
 
 	LOCK(this);
-	rc = request_irq(this->pdata->irq, &synaptics_clearpad_irq,
-			IRQF_TRIGGER_FALLING,
-			this->pdev->dev.driver->name,
-			&this->pdev->dev);
+	rc = devm_request_irq(dev, this->irq, synaptics_clearpad_irq,
+			      IRQF_TRIGGER_FALLING,
+			      dev->driver->name,
+			      this);
 	if (rc) {
-		dev_err(&this->pdev->dev,
-		       "irq %d busy?\n", this->pdata->irq);
+		dev_err(dev, "irq %d busy?\n", this->irq);
 		UNLOCK(this);
 		goto err_fb_notif;
 	}
-	disable_irq(this->pdata->irq);
+	disable_irq(this->irq);
 	UNLOCK(this);
 
 	return 0;
@@ -1997,36 +2057,23 @@ err_fb_notif:
 	fb_unregister_client(&this->fb_notif);
 #endif
 err_input_unregister:
-	input_set_drvdata(this->input, NULL);
 	input_unregister_device(this->input);
-err_gpio_teardown:
-	if (this->pdata->gpio_configure)
-		this->pdata->gpio_configure(0);
 err_vreg_teardown:
-	if (this->pdata->vreg_configure)
-		this->pdata->vreg_configure(0);
-err_free:
-	dev_set_drvdata(&pdev->dev, NULL);
-	kfree(this);
+	regulator_disable(this->vdd);
 	return rc;
 }
 
 static int clearpad_remove(struct platform_device *pdev)
 {
-	struct synaptics_clearpad *this = dev_get_drvdata(&pdev->dev);
+	struct synaptics_clearpad *this = platform_get_drvdata(pdev);
 
-	free_irq(this->pdata->irq, &this->pdev->dev);
 #ifdef CONFIG_FB
 	fb_unregister_client(&this->fb_notif);
 #endif
 	input_unregister_device(this->input);
 	sysfs_remove_group(&this->input->dev.kobj, &synaptics_clearpad_attrs);
 
-	if (this->pdata->gpio_configure)
-		this->pdata->gpio_configure(0);
-	if (this->pdata->vreg_configure)
-		this->pdata->vreg_configure(0);
-	kfree(this);
+	regulator_disable(this->vdd);
 
 	return 0;
 }
@@ -2048,19 +2095,7 @@ static struct platform_driver clearpad_driver = {
 	.probe		= clearpad_probe,
 	.remove		= clearpad_remove,
 };
-
-static int __init clearpad_init(void)
-{
-	return platform_driver_register(&clearpad_driver);
-}
-
-static void __exit clearpad_exit(void)
-{
-	platform_driver_unregister(&clearpad_driver);
-}
-
-module_init(clearpad_init);
-module_exit(clearpad_exit);
+module_platform_driver(clearpad_driver);
 
 MODULE_DESCRIPTION(CLEARPAD_NAME "ClearPad Driver");
 MODULE_LICENSE("GPL v2");
