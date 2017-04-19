@@ -50,35 +50,35 @@ typedef enum {
 
 /* panel info type */
 struct lcd_panel_info {
-	__u32 vsync_enable;
-	__u32 primary_vsync_init;
-	__u32 primary_rdptr_irq;
-	__u32 primary_start_pos;
-	__u32 vsync_threshold_continue;
-	__u32 vsync_threshold_start;
-	__u32 total_lines;
-	__u32 refx100;
-	__u32 v_back_porch;
-	__u32 v_front_porch;
-	__u32 v_pulse_width;
-	__u32 hw_vsync_mode;
-	__u32 blt_ctrl;
-	__u32 rev;
+	u32 vsync_enable;
+	u32 primary_vsync_init;
+	u32 primary_rdptr_irq;
+	u32 primary_start_pos;
+	u32 vsync_threshold_continue;
+	u32 vsync_threshold_start;
+	u32 total_lines;
+	u32 refx100;
+	u32 v_back_porch;
+	u32 v_front_porch;
+	u32 v_pulse_width;
+	u32 hw_vsync_mode;
+	u32 blt_ctrl;
+	u32 rev;
 };
 
 struct mddi_panel_info {
-	__u32 vdopkt;
+	u32 vdopkt;
 };
 
 struct msm_panel_info {
 	struct device *dev;
-	__u32 xres;
-	__u32 yres;
-	__u32 bpp;
-	__u32 type;
+	u32 xres;
+	u32 yres;
+	u32 bpp;
+	u32 type;
 	DISP_TARGET_PHYS pdest;
-	__u32 clk_rate;
-	__u32 frame_rate;
+	u32 clk_rate;
+	u32 frame_rate;
 
 	struct mddi_panel_info mddi;
 	struct lcd_panel_info lcd;
