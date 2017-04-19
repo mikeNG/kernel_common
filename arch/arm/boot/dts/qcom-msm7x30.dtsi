@@ -469,14 +469,17 @@
 			sdcc2: sdcc@A0500000 {
 				status		= "disabled";
 				compatible	= "arm,pl18x", "arm,primecell";
-				arm,primecell-periphid = <0x00051180>;
 				reg		= <0xA0500000 0x1000>;
+				arm,primecell-periphid = <0x00051180>;
+
 				interrupts	= <98 IRQ_TYPE_LEVEL_HIGH>,
 						  <99 IRQ_TYPE_LEVEL_HIGH>;
 				interrupt-names	= "cmd_irq", "pio_irq";
+
 				clocks		= <&gcc SDC2_CLK>,
 						  <&gcc SDC2_P_CLK>;
 				clock-names	= "mclk", "apb_pclk";
+
 				bus-width	= <8>;
 				max-frequency	= <49152000>;
 				non-removable;
@@ -484,7 +487,9 @@
 				cap-mmc-highspeed;
 				cap-mmc-hw-reset;
 				mmc-cap-mmc-erase;
-				vmmc-supply = <&smps3>;
+
+				vmmc-supply	= <&ldo5>;
+				vqmmc-supply	= <&smps3>;
 
 				pinctrl-names	= "default";
 				pinctrl-0	= <&sdc2_gpios>;
@@ -497,29 +502,38 @@
 			sdcc3: sdcc@A3000000 {
 				status		= "disabled";
 				compatible	= "arm,pl18x", "arm,primecell";
-				arm,primecell-periphid = <0x00051180>;
 				reg		= <0xA3000000 0x1000>;
+				arm,primecell-periphid = <0x00051180>;
+
 				interrupts	= <96 IRQ_TYPE_LEVEL_HIGH>,
 						  <97 IRQ_TYPE_LEVEL_HIGH>;
 				interrupt-names	= "cmd_irq", "pio_irq";
+				cap-sdio-irq	= <&tlmm 118 IRQ_TYPE_LEVEL_LOW>;
+
 				clocks		= <&gcc SDC3_CLK>,
 						  <&gcc SDC3_P_CLK>;
 				clock-names	= "mclk", "apb_pclk";
+
 				bus-width	= <4>;
 				max-frequency	= <49152000>;
 				cap-sd-highspeed;
 				cap-mmc-highspeed;
 				cap-mmc-hw-reset;
-				cap-sdio-irq	= <&tlmm 118 IRQ_TYPE_LEVEL_LOW>;
-				enable-sdio-wakeup;
 				mmc-cap-mmc-erase;
+
+				enable-sdio-wakeup;
 				wakeup-source;
-				vmmc-supply = <&smps3>;
+
+				vmmc-supply	= <&ldo5>;
+				vqmmc-supply	= <&smps3>;
 
 				pinctrl-names	= "default", "sleep";
 				pinctrl-0	= <&sdc3_active_gpios>;
 				pinctrl-1	= <&sdc3_sleep_gpios>;
 
+				/* SDC3 uses same DMA channel as SDC4.
+				 * Current DMA does not allow multiple
+				 * devices per channel. */
 				//dmas = <&adm_dma 8>;
 				//dma-names = "rx";
 				//qcom,crci = <12>;
@@ -528,22 +542,28 @@
 			sdcc4: sdcc@A3100000 {
 				status		= "disabled";
 				compatible	= "arm,pl18x", "arm,primecell";
-				arm,primecell-periphid = <0x00051180>;
 				reg		= <0xA3100000 0x1000>;
+				arm,primecell-periphid = <0x00051180>;
+
 				interrupts	= <100 IRQ_TYPE_LEVEL_HIGH>,
 						  <101 IRQ_TYPE_LEVEL_HIGH>;
 				interrupt-names	= "cmd_irq", "pio_irq";
+
 				clocks		= <&gcc SDC4_CLK>,
 						  <&gcc SDC4_P_CLK>;
 				clock-names	= "mclk", "apb_pclk";
+
 				bus-width	= <4>;
 				max-frequency	= <49152000>;
 				cap-sd-highspeed;
 				cap-mmc-highspeed;
 				cap-mmc-hw-reset;
 				mmc-cap-mmc-erase;
-				vmmc-supply = <&ldo5>;
 				no-1-8-v;
+
+				vmmc-supply	= <&ldo5>;
+				vqmmc-supply	= <&smps3>;
+
 				cd-gpios = <&pm8058_gpio 36 0>;
 
 				pinctrl-names	= "default";
