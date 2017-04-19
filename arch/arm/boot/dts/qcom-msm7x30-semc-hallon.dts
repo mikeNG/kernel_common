@@ -6,6 +6,9 @@
 	model = "SEMC Xperia Neo";
 };
 
+#include "mddi-panel-novatek-hitachi-dx09d09vm.dtsi"
+#include "mddi-panel-novatek-sony-acx424akm.dtsi"
+
 &i2c0 {
 	as3676@40 {
 		dls-connected;

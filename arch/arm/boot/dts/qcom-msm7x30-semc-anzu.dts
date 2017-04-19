@@ -6,6 +6,9 @@
 	model = "SEMC Xperia Arc/Arc S";
 };
 
+#include "mddi-panel-novatek-sharp-ls042t3lx.dtsi"
+#include "mddi-panel-novatek-sony-acx427ak.dtsi"
+
 &i2c0 {
 	as3676@40 {
 		als-wait = <100>;

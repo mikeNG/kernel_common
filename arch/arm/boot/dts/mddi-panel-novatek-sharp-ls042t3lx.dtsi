@@ -1,0 +1,133 @@
+&mdp_mddi {
+	nt-sharp-ls042t3lx-type1 {
+		compatible = "novatek,mddi-panel";
+
+		i2c-bus = <&i2c4>;
+		i2c-addr = <0x4C>;
+		i2c-detect = <0xDB00 0x90
+			      0xDC00 0x01>;
+
+		esd-supported;
+		suspend-supported;
+
+		clock-frequency	= <192000000>;
+		gpio-reset	= <&tlmm 157 0>;
+		panel-init	= <0x0000    120
+				   0xC980 0x0000
+				   0xE780 0x0000
+				   0xF380 0x00CC
+				   0xEE80 0x0000
+				   0x3500 0x0000
+				   0x0000     10>;
+		panel-setup	= <0x1100 0x0000
+				   0x0000    120	/* sleep_ms(120) */
+				   0x1280 0x00C8	/* PCH_CTRL */
+				   0x2A00 0x0000	/* SET_HORIZONTAL_ADDRESS_0 */
+				   0x2A01 0x0000	/* SET_HORIZONTAL_ADDRESS_1 */
+				   0x2A02 0x0001	/* SET_HORIZONTAL_ADDRESS_2 */
+				   0x2A03 0x00DF	/* SET_HORIZONTAL_ADDRESS_3 */
+				   0x2B00 0x0000	/* SET_VERTICAL_ADDRESS_0 */
+				   0x2B01 0x0000	/* SET_VERTICAL_ADDRESS_1 */
+				   0x2B02 0x0003	/* SET_VERTICAL_ADDRESS_2 */
+				   0x2B03 0x0055	/* SET_VERTICAL_ADDRESS_3 */
+				   0x2D00 0x0000	/* SET_RAM_ADDRESS_0 */
+				   0x2D01 0x0000	/* SET_RAM_ADDRESS_1 */
+				   0x2D02 0x0003	/* SET_RAM_ADDRESS_2 */
+				   0x2D03 0x0055	/* SET_RAM_ADDRESS_3 */
+				   /* FTE */
+				   0x4400 0x0000
+				   0x4401 0x0000
+				   0x3500 0x0000
+				   0x3600 0x0000
+				   0x3A00 0x0077
+				   0x0180 0x0014	/* PORCH_CONTROL */
+				   0x9680 0x0004	/* LPTS_CTRL3 */
+				   0x9880 0x0004	/* LPTS_CTRL5 */
+				   0x9980 0x0021	/* LPTS_CTRL6 */
+				   0x9A80 0x001F	/* LPTS_CTRL7 */
+				   /* Rotation Function */
+				   0xA280 0x0003>;
+		panel-turnon	= <0x2900 0x0000>;	/* SET_DISPLAY_ON */
+		panel-turnoff	= <0x2800 0x0000>;	/* SET_DISPLAY_OFF */
+		panel-takedown	= <0x1000 0x0000
+				   0x0000     70>;	/* sleep_ms(70) */
+		panel-standby	= <0x4F00 0x0001>;
+
+		panel-bpp	= <24>;
+		panel-refx100	= <6000>;
+		panel-rev	= <1>;
+		panel-vback	= <10>;
+		panel-vfront	= <4>;
+		panel-xres	= <480>;
+		panel-yres	= <854>;
+
+		vdd-supply	= <&ldo15>;
+		vio-supply	= <&ldo8>;
+	};
+
+	nt-sharp-ls042t3lx-type2 {
+		compatible = "novatek,mddi-panel";
+
+		i2c-bus = <&i2c4>;
+		i2c-addr = <0x4C>;
+		i2c-detect = <0xDA00 0x70
+			      0xDC00 0x01>;
+
+		esd-supported;
+		suspend-supported;
+
+		clock-frequency	= <192000000>;
+		gpio-reset	= <&tlmm 157 0>;
+		panel-init	= <0x0000    120
+				   0xC980 0x0000
+				   0xE780 0x0000
+				   0xF380 0x00CC
+				   0xEE80 0x0000
+				   0x3500 0x0000
+				   0x0000     10>;
+		panel-setup	= <0x1100 0x0000
+				   0x0000    120	/* sleep_ms(120) */
+				   0x1280 0x00C8	/* PCH_CTRL */
+				   0x2A00 0x0000	/* SET_HORIZONTAL_ADDRESS_0 */
+				   0x2A01 0x0000	/* SET_HORIZONTAL_ADDRESS_1 */
+				   0x2A02 0x0001	/* SET_HORIZONTAL_ADDRESS_2 */
+				   0x2A03 0x00DF	/* SET_HORIZONTAL_ADDRESS_3 */
+				   0x2B00 0x0000	/* SET_VERTICAL_ADDRESS_0 */
+				   0x2B01 0x0000	/* SET_VERTICAL_ADDRESS_1 */
+				   0x2B02 0x0003	/* SET_VERTICAL_ADDRESS_2 */
+				   0x2B03 0x0055	/* SET_VERTICAL_ADDRESS_3 */
+				   0x2D00 0x0000	/* SET_RAM_ADDRESS_0 */
+				   0x2D01 0x0000	/* SET_RAM_ADDRESS_1 */
+				   0x2D02 0x0003	/* SET_RAM_ADDRESS_2 */
+				   0x2D03 0x0055	/* SET_RAM_ADDRESS_3 */
+				   /* FTE */
+				   0x4400 0x0000
+				   0x4401 0x0000
+				   0x3500 0x0000
+				   0x3600 0x0000
+				   0x3A00 0x0077
+				   0x0180 0x0014	/* PORCH_CONTROL */
+				   0x9680 0x0004	/* LPTS_CTRL3 */
+				   0x9880 0x0004	/* LPTS_CTRL5 */
+				   0x9980 0x0021	/* LPTS_CTRL6 */
+				   0x9A80 0x001F	/* LPTS_CTRL7 */
+				   /* Rotation Function */
+				   0xA280 0x0003>;
+		panel-turnon	= <0x2900 0x0000>;	/* SET_DISPLAY_ON */
+		panel-turnoff	= <0x2800 0x0000>;	/* SET_DISPLAY_OFF */
+		panel-takedown	= <0x1000 0x0000
+				   0x0000     70>;	/* sleep_ms(70) */
+		panel-standby	= <0x4F00 0x0001>;
+
+		panel-bpp	= <24>;
+		panel-refx100	= <6000>;
+		panel-rev	= <2>;
+		panel-vback	= <10>;
+		panel-vfront	= <4>;
+		panel-xres	= <480>;
+		panel-yres	= <854>;
+
+		vdd-supply	= <&ldo15>;
+		vio-supply	= <&ldo8>;
+	};
+};

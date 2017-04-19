@@ -9,6 +9,9 @@
 	};
 };
 
+#include "mddi-panel-novatek-sharp-ls040t8lx01.dtsi"
+#include "mddi-panel-novatek-tmd-mdp42.dtsi"
+
 &i2c0 {
 	as3676@40 {
 		dls-connected;

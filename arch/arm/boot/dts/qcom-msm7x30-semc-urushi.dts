@@ -6,6 +6,9 @@
 	model = "SEMC Xperia Ray";
 };
 
+#include "mddi-panel-novatek-sharp-ls033t3lx01.dtsi"
+#include "mddi-panel-novatek-tmd-lt033mdv1000.dtsi"
+
 &i2c0 {
 	clearpad@2C {
 		compatible = "synaptics,i2c-clearpad";

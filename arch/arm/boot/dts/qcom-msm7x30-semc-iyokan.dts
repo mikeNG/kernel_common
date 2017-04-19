@@ -6,6 +6,8 @@
 	model = "SEMC Xperia Pro";
 };
 
+#include "mddi-panel-novatek-sony-acx424ak.dtsi"
+
 &i2c0 {
 	as3676@40 {
 		als-wait = <100>;

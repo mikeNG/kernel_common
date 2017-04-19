@@ -1,0 +1,46 @@
+&mdp_mddi {
+	nt-sony-acx427ak {
+		compatible = "novatek,mddi-panel";
+
+		i2c-bus = <&i2c4>;
+		i2c-addr = <0x4C>;
+		i2c-detect = <0xDA00 0x01
+			      0xDC00 0x04>;
+
+		esd-supported;
+		suspend-supported;
+
+		clock-frequency	= <192000000>;
+		gpio-reset	= <&tlmm 157 0>;
+		panel-init	= <0xAE00 0x0003	/* Set MDDI1.2 2Lane */
+				   /* LED PWM */
+				   0x5500 0x0000
+				   0x5300 0x0000
+				   /* FTE */
+				   0x4400 0x0000	/* SET_TEAR_SCANLINE */
+				   0x4401 0x0000	/* SET_TEAR_SCANLINE */
+				   0x3500 0x0000	/* SET_TEAR_ON */
+				   /* Rotation Function */
+				   0xC980 0x0001
+				   0xA280 0x0003
+				   0x3600 0x0000>;	/* SET_ADDRESS_MODE */
+		panel-setup	= <0x1100 0x0000
+				   0x0000     10>;	/* sleep_ms(10) */
+		panel-turnon	= <0x2900 0x0000>;	/* SET_DISPLAY_ON */
+		panel-turnoff	= <0x2800 0x0000>;	/* SET_DISPLAY_OFF */
+		panel-takedown	= <0x1000 0x0000
+				   0x0000     70>;	/* sleep_ms(70) */
+		panel-standby	= <0x4F00 0x0001>;
+
+		panel-bpp	= <24>;
+		panel-refx100	= <6300>;
+		panel-rev	= <2>;
+		panel-vback	= <10>;
+		panel-vfront	= <6>;
+		panel-xres	= <480>;
+		panel-yres	= <854>;
+
+		vdd-supply	= <&ldo15>;
+		vio-supply	= <&ldo8>;
+	};
+};
