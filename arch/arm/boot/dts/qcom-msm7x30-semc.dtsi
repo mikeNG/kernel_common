@@ -1,5 +1,20 @@
 #include "qcom-msm7x30.dtsi"
 
+/ {
+	pstore_reserve_mem: pstore_reserve_region@0 {
+		reg = <0x1cca000 0x80000>;
+		reg-names = "ramoops_mem";
+	};
+
+	ramoops {
+		compatible = "ramoops";
+		memory-region = <&pstore_reserve_mem>;
+		record-size = <0x0 0x20000>;
+		console-size = <0x0 0x40000>;
+		ftrace-size = <0x0 0x20000>;
+	};
+};
+
 &i2c0 {
 	as3676@40 {
 		compatible = "ams,as3676";
