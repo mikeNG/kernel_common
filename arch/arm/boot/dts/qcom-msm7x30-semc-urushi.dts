@@ -7,6 +7,81 @@
 };
 
 &i2c0 {
+	clearpad@2C {
+		compatible = "synaptics,i2c-clearpad";
+		reg = <0x2C>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <42 IRQ_TYPE_LEVEL_LOW>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&clearpad_gpios>;
+
+		vdd-supply = <&ldo20>;
+		vio-supply = <&ldo8>;
+
+		pointer {
+			syn,x1 = <0>;
+			syn,y1 = <0>;
+			syn,x2 = <479>;
+			syn,y2 = <853>;
+
+			syn,pointer;
+		};
+
+		bottom-edge {
+			syn,x1 = <0>;
+			syn,y1 = <854>;
+			syn,x2 = <479>;
+			syn,y2 = <863>;
+
+			syn,bottom-edge;
+		};
+
+		back-key {
+			syn,x1 = <0>;
+			syn,y1 = <884>;
+			syn,x2 = <159>;
+			syn,y2 = <921>;
+
+			syn,button;
+			linux,type = <0x01>;
+			linux,code = <158>;
+		};
+
+		back-key-inbound {
+			syn,x1 = <0>;
+			syn,y1 = <884>;
+			syn,x2 = <179>;
+			syn,y2 = <921>;
+
+			syn,button-inbound;
+			linux,type = <0x01>;
+			linux,code = <158>;
+		};
+
+		menu-key {
+			syn,x1 = <320>;
+			syn,y1 = <884>;
+			syn,x2 = <479>;
+			syn,y2 = <921>;
+
+			syn,button;
+			linux,type = <0x01>;
+			linux,code = <139>;
+		};
+
+		menu-key-inbound {
+			syn,x1 = <300>;
+			syn,y1 = <864>;
+			syn,x2 = <479>;
+			syn,y2 = <921>;
+
+			syn,button-inbound;
+			linux,type = <0x01>;
+			linux,code = <139>;
+		};
+	};
+
 	as3676@40 {
 		als-wait = <100>;
 
@@ -91,5 +166,17 @@
 &sdc4_gpios {
 	sdc4_clkdat {
 		drive-strength = <4>;
+	};
+};
+
+&tlmm {
+	clearpad_gpios: clearpad_gpios {
+		clearpad_irq {
+			pins = "gpio42";
+			function = "gpio";
+			bias-pull-up;
+			drive-strength = <2>;
+			input-enable;
+		};
 	};
 };
