@@ -19,4 +19,5 @@ obj-$(CONFIG_FB_MSM_MDDI) += msm-mddi.o
 msm-mddi-y += mddi.o
 msm-mddi-y += mddihost.o
 msm-mddi-y += mddihosti.o
+msm-mddi-y += mddi_novatek_panel.o
 msm-mddi-y += mddi_panel.o
