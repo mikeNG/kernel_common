@@ -692,6 +692,18 @@ static const struct pinctrl_ops msm_pinctrl_v1_ops = {
 	.dt_free_map		= pinctrl_utils_dt_free_map,
 };
 
+static int msm_pinmux_free(struct pinctrl_dev *pctldev, unsigned offset)
+{
+	struct msm_pinctrl_v1 *pctrl = pinctrl_dev_get_drvdata(pctldev);
+	const struct msm_pingroup_v1 *g;
+
+	g = &pctrl->soc->groups[offset];
+
+	gpio_tlmm_config(pctrl->tlmm[g->index], GPIO_CFG_DISABLE);
+
+	return 0;
+}
+
 static int msm_get_functions_count(struct pinctrl_dev *pctldev)
 {
 	struct msm_pinctrl_v1 *pctrl = pinctrl_dev_get_drvdata(pctldev);
@@ -751,6 +763,7 @@ static int msm_pinmux_set_mux(struct pinctrl_dev *pctldev,
 }
 
 static const struct pinmux_ops msm_pinmux_v1_ops = {
+	.free			= msm_pinmux_free,
 	.get_functions_count	= msm_get_functions_count,
 	.get_function_name	= msm_get_function_name,
 	.get_function_groups	= msm_get_function_groups,
