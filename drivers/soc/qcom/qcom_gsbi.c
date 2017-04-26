@@ -249,7 +249,18 @@ static struct platform_driver gsbi_driver = {
 	.remove	= gsbi_remove,
 };
 
-module_platform_driver(gsbi_driver);
+/* GSBI may be needed to bring up other drivers */
+static int __init gsbi_init_driver(void)
+{
+	return platform_driver_register(&gsbi_driver);
+}
+subsys_initcall(gsbi_init_driver);
+
+static void __exit gsbi_exit_driver(void)
+{
+	platform_driver_unregister(&gsbi_driver);
+}
+module_exit(gsbi_exit_driver);
 
 MODULE_AUTHOR("Andy Gross <agross@codeaurora.org>");
 MODULE_DESCRIPTION("QCOM GSBI driver");
