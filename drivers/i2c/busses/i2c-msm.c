@@ -83,14 +83,15 @@ struct msm_i2c_dev {
 	bool			rmutex;
 	const char		*rsl_id;
 	uint32_t		pm_lat;
-	int			gpio_clk;
-	int			gpio_dat;
 	struct timer_list	pwr_timer;
 	bool			clk_enabled;
 	void			*complete;
 
 	struct pm_qos_request pm_qos_req;
-	struct pinctrl *pctrl;
+
+	struct pinctrl		*pctrl;
+	int			gpio_clk;
+	int			gpio_dat;
 };
 
 static void msm_i2c_pwr_mgmt(struct msm_i2c_dev *dev, unsigned int state)
@@ -290,14 +291,15 @@ static int msm_i2c_recover_bus_busy(struct msm_i2c_dev *dev,
 	uint32_t status = readl(dev->base + I2C_STATUS);
 	struct pinctrl_state *pins_io;
 	struct pinctrl_state *pins_default;
-
-	if (!dev->pctrl) {
-		dev_err(dev->dev, "pinctrl not supported by this bus\n");
-		return -EINVAL;
-	}
+	bool gpio_clk_status = false;
 
 	if (!(status & (I2C_STATUS_BUS_ACTIVE | I2C_STATUS_WR_BUFFER_FULL)))
 		return 0;
+
+	if (!dev->pctrl) {
+		dev_dbg(dev->dev, "pinctrl not supported by this bus\n");
+		return 0;
+	}
 
 	pins_io = pinctrl_lookup_state(dev->pctrl, "io");
 	if (IS_ERR(pins_io)) {
@@ -329,7 +331,6 @@ static int msm_i2c_recover_bus_busy(struct msm_i2c_dev *dev,
 	}
 
 	for (i = 0; i < 9; i++) {
-		bool gpio_clk_status = false;
 		if (gpio_get_value(dev->gpio_dat) && gpio_clk_status)
 			break;
 		gpio_direction_output(dev->gpio_clk, 0);
