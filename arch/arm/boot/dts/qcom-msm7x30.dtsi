@@ -368,7 +368,7 @@
 			#size-cells = <0>;
 		};
 
-		msm-i2c-2@ACF00000 {
+		i2c2: msm-i2c-2@ACF00000 {
 			compatible ="qcom,msm-i2c";
 			reg = <0xACF00000 0x1000>;
 			interrupts = <54 1>;
