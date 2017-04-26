@@ -216,14 +216,14 @@ static int proccomm_vreg_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
-	rdesc->min_uV = initdata->constraints.min_uV;
-	if (initdata->constraints.valid_ops_mask & REGULATOR_CHANGE_VOLTAGE) {
+
+	if (initdata->constraints.min_uV != 0 &&
+	    initdata->constraints.max_uV != 0) {
+		rdesc->min_uV = initdata->constraints.min_uV;
 		rdesc->uV_step = 25000;
 		rdesc->n_voltages = ((initdata->constraints.max_uV -
 				      initdata->constraints.min_uV) /
 				     rdesc->uV_step) + 1;
-	} else {
-		rdesc->n_voltages = 1;
 	}
 
 	rdesc->name = initdata->constraints.name;
