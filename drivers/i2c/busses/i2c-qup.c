@@ -1791,7 +1791,18 @@ static struct platform_driver qup_i2c_driver = {
 	},
 };
 
-module_platform_driver(qup_i2c_driver);
+/* QUP may be needed to bring up other drivers */
+static int __init qup_i2c_init_driver(void)
+{
+	return platform_driver_register(&qup_i2c_driver);
+}
+subsys_initcall(qup_i2c_init_driver);
+
+static void __exit qup_i2c_exit_driver(void)
+{
+	platform_driver_unregister(&qup_i2c_driver);
+}
+module_exit(qup_i2c_exit_driver);
 
 MODULE_LICENSE("GPL v2");
 MODULE_ALIAS("platform:i2c_qup");
