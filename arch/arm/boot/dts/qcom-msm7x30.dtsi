@@ -5,6 +5,7 @@
 #include <dt-bindings/reset/qcom,gcc-msm7x30.h>
 #include <dt-bindings/interrupt-controller/irq.h>
 #include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
+#include <dt-bindings/soc/qcom,gsbi.h>
 
 /include/ "skeleton.dtsi"
 
@@ -382,6 +383,39 @@
 
 			#address-cells = <1>;
 			#size-cells = <0>;
+		};
+
+		gsbi@A8300000 {
+			compatible = "qcom,gsbi-v1.0.0";
+			reg = <0xA8300000 0x100>;
+
+			cell-index = <1>;
+			qcom,mode = <GSBI_PROT_I2C>;
+
+			clocks = <&gcc CAMIF_PAD_P_CLK>;
+			clock-names = "iface";
+
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges;
+
+			i2c4: i2c@A8301000 {
+				compatible = "qcom,i2c-qup-v1.0.0";
+				reg = <0xA8301000 0x1000>;
+
+				interrupts = <102 1>, <103 1>, <104 1>;
+				interrupt-names = "in", "out", "err";
+
+				clocks = <&gcc QUP_I2C_CLK>, <&gcc CAMIF_PAD_P_CLK>;
+				clock-names = "core", "iface";
+				clock-frequency = <384000>;
+
+				pinctrl-0 = <&qup_i2c_gpios>;
+				pinctrl-names = "default";
+
+				#address-cells = <1>;
+				#size-cells = <0>;
+			};
 		};
 
 		qcom,ssbi@AD900000 {
@@ -797,6 +831,16 @@
 			function = "peripheral2";
 			bias-pull-up;
 			drive-strength = <8>;
+		};
+	};
+
+	qup_i2c_gpios: qup_i2c_gpios {
+		qup_sclsda {
+			pins = "gpio16", "gpio17";
+			function = "peripheral2";
+			bias-pull-none;
+			drive-strength = <16>;
+			input-enable;
 		};
 	};
 
