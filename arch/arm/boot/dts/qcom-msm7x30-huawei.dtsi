@@ -40,6 +40,7 @@
 
 &ldo11 {
 	regulator-min-microvolt = <1800000>;
+	regulator-always-on;
 };
 
 &ldo20 {
