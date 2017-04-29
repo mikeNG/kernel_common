@@ -161,6 +161,8 @@ struct qup_i2c_dev {
 	struct device		*dev;
 	void __iomem		*base;
 	int			irq;
+	int			irq_out;
+	int			num_irqs;
 	struct clk		*clk;
 	struct clk		*pclk;
 	struct i2c_adapter	adap;
@@ -218,6 +220,11 @@ static irqreturn_t qup_i2c_interrupt(int irq, void *dev)
 	bus_err &= I2C_STATUS_ERROR_MASK;
 	qup_err &= QUP_STATUS_ERROR_FLAGS;
 
+	/* On I2C read failure, the QUP only generates out (and err) irq. */
+	if (irq == qup->irq_out && qup->msg->flags & I2C_M_RD &&
+	    !(bus_err || qup_err))
+		return IRQ_HANDLED;
+
 	/* Clear the error bits in QUP_ERROR_FLAGS */
 	if (qup_err)
 		writel(qup_err, qup->base + QUP_ERROR_FLAGS);
@@ -232,7 +239,7 @@ static irqreturn_t qup_i2c_interrupt(int irq, void *dev)
 		goto done;
 	}
 
-	if (opflags & QUP_IN_SVC_FLAG)
+	if (opflags & QUP_IN_SVC_FLAG || opflags & QUP_MX_INPUT_DONE)
 		writel(QUP_IN_SVC_FLAG, qup->base + QUP_OPERATIONAL);
 
 	if (opflags & QUP_OUT_SVC_FLAG)
@@ -976,6 +983,9 @@ static int qup_i2c_write_one(struct qup_i2c_dev *qup, struct i2c_msg *msg)
 	qup->pos = 0;
 
 	enable_irq(qup->irq);
+	if (qup->num_irqs > 1) {
+		enable_irq(qup->irq_out);
+	}
 
 	qup_i2c_set_write_mode(qup, msg);
 
@@ -1007,6 +1017,9 @@ static int qup_i2c_write_one(struct qup_i2c_dev *qup, struct i2c_msg *msg)
 	ret = qup_i2c_wait_ready(qup, QUP_OUT_NOT_EMPTY, RESET_BIT, ONE_BYTE);
 err:
 	disable_irq(qup->irq);
+	if (qup->num_irqs > 1) {
+		disable_irq(qup->irq_out);
+	}
 	qup->msg = NULL;
 
 	return ret;
@@ -1194,6 +1207,10 @@ static int qup_i2c_read_one(struct qup_i2c_dev *qup, struct i2c_msg *msg)
 	qup->pos  = 0;
 
 	enable_irq(qup->irq);
+	if (qup->num_irqs > 1) {
+		enable_irq(qup->irq_out);
+	}
+
 	qup_i2c_set_read_mode(qup, msg->len);
 
 	ret = qup_i2c_change_state(qup, QUP_RUN_STATE);
@@ -1224,6 +1241,9 @@ static int qup_i2c_read_one(struct qup_i2c_dev *qup, struct i2c_msg *msg)
 
 err:
 	disable_irq(qup->irq);
+	if (qup->num_irqs > 1) {
+		disable_irq(qup->irq_out);
+	}
 	qup->msg = NULL;
 
 	return ret;
@@ -1444,7 +1464,8 @@ static int qup_i2c_probe(struct platform_device *pdev)
 			DEFAULT_CLK_FREQ);
 	}
 
-	if (of_device_is_compatible(pdev->dev.of_node, "qcom,i2c-qup-v1.1.1")) {
+	if (of_device_is_compatible(pdev->dev.of_node, "qcom,i2c-qup-v1.0.0") ||
+	    of_device_is_compatible(pdev->dev.of_node, "qcom,i2c-qup-v1.1.1")) {
 		qup->adap.algo = &qup_i2c_algo;
 		qup->adap.quirks = &qup_i2c_quirks;
 	} else {
@@ -1517,6 +1538,13 @@ nodma:
 		dev_err(qup->dev, "No IRQ defined\n");
 		return qup->irq;
 	}
+	qup->irq_out = platform_get_irq(pdev, 1);
+	if (qup->irq_out >= 0)
+		qup->num_irqs = 2;
+	else
+		qup->num_irqs = 1;
+
+	dev_dbg(qup->dev, "Using %d interrupts\n", qup->num_irqs);
 
 	if (has_acpi_companion(qup->dev)) {
 		ret = device_property_read_u32(qup->dev,
@@ -1551,13 +1579,47 @@ nodma:
 	if (ret)
 		goto fail;
 
-	ret = devm_request_irq(qup->dev, qup->irq, qup_i2c_interrupt,
-			       IRQF_TRIGGER_HIGH, "i2c_qup", qup);
-	if (ret) {
-		dev_err(qup->dev, "Request %d IRQ failed\n", qup->irq);
-		goto fail;
+	/*
+	 * We use num_irqs to also indicate if we got 3 interrupts or just 1.
+	 * If we have just 1, we use single irq as the general purpose irq
+	 * and handle the changes in ISR accordingly
+	 * Per Hardware guidelines, if we have 3 interrupts, they are always
+	 * edge triggering, and if we have 1, it's always level-triggering
+	 */
+	if (qup->num_irqs == 1) {
+		ret = devm_request_irq(qup->dev, qup->irq, qup_i2c_interrupt,
+				       IRQF_TRIGGER_HIGH, "i2c_qup", qup);
+		if (ret) {
+			dev_err(qup->dev, "Request %d IRQ failed\n",
+				qup->irq);
+			goto fail;
+		}
+	} else {
+		ret = devm_request_irq(qup->dev, qup->irq, qup_i2c_interrupt,
+				       IRQF_TRIGGER_RISING, "i2c_qup_in", qup);
+		if (ret) {
+			dev_err(qup->dev, "Request %d IRQ failed\n",
+				qup->irq);
+			goto fail;
+		}
+		ret = devm_request_irq(qup->dev, qup->irq_out,
+				       qup_i2c_interrupt,
+				       IRQF_TRIGGER_RISING, "i2c_qup_out", qup);
+		if (ret) {
+			dev_err(qup->dev, "Request %d IRQ failed\n",
+				qup->irq_out);
+			goto fail;
+		}
+		/*
+		 * This is where you'd expect to find ERR interrupt request,
+		 * however this interrupt is explicitly disabled as the chip
+		 * sends our both out/in and err, on error cases.
+		 */
 	}
 	disable_irq(qup->irq);
+	if (qup->num_irqs > 1) {
+		disable_irq(qup->irq_out);
+	}
 
 	hw_ver = readl(qup->base + QUP_HW_VERSION);
 	dev_dbg(qup->dev, "Revision %x\n", hw_ver);
@@ -1644,6 +1706,9 @@ static int qup_i2c_remove(struct platform_device *pdev)
 	}
 
 	disable_irq(qup->irq);
+	if (qup->num_irqs > 1) {
+		disable_irq(qup->irq_out);
+	}
 	qup_i2c_disable_clocks(qup);
 	i2c_del_adapter(&qup->adap);
 	pm_runtime_disable(qup->dev);
@@ -1699,6 +1764,7 @@ static const struct dev_pm_ops qup_i2c_qup_pm_ops = {
 };
 
 static const struct of_device_id qup_i2c_dt_match[] = {
+	{ .compatible = "qcom,i2c-qup-v1.0.0" },
 	{ .compatible = "qcom,i2c-qup-v1.1.1" },
 	{ .compatible = "qcom,i2c-qup-v2.1.1" },
 	{ .compatible = "qcom,i2c-qup-v2.2.1" },
