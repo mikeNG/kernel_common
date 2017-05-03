@@ -29,6 +29,10 @@
 	regulator-max-microvolt = <3500000>;
 };
 
+&ldo10 {
+	regulator-always-on;
+};
+
 &ldo11 {
 	regulator-max-microvolt = <2800000>;
 };
