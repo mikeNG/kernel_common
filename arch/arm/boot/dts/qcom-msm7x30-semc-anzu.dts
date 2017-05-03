@@ -89,3 +89,9 @@
 		drive-strength = <4>;
 	};
 };
+
+&qup_i2c_gpios {
+	qup_sclsda {
+		drive-strength = <4>;
+	};
+};
