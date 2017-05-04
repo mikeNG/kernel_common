@@ -1001,13 +1001,6 @@ static int synaptics_clearpad_set_power(struct synaptics_clearpad *this)
 		LOG_CHECK(this, "enter sleep mode\n");
 		synaptics_clearpad_set_irq(this, IRQ_SET_POWER, false);
 
-		/* Lie to the listening applications, tell them that there
-		 * are no fingers touching. */
-		if (users) {
-			input_mt_sync(this->input);
-			input_sync(this->input);
-		}
-
 		this->active &= ~SYN_ACTIVE_POWER;
 	} else {
 		dev_info(&this->pdev->dev, "no change (%d)\n", should_wake);
